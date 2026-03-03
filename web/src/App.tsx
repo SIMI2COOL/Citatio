@@ -17,16 +17,6 @@ const LANG_OPTIONS: { code: string; label: string }[] = [
   { code: "tr", label: "Türkçe" },
 ];
 
-const TRENDING = [
-  "machine learning",
-  "deep learning",
-  "climate change",
-  "neural networks",
-  "natural language processing",
-  "computer vision",
-  "reinforcement learning",
-];
-
 const QUICK_KEYWORDS = [
   "systematic review",
   "meta-analysis",
@@ -34,9 +24,6 @@ const QUICK_KEYWORDS = [
   "large language models",
   "sustainability",
 ];
-
-const HISTORY_KEY = "citatio_search_history";
-const MAX_HISTORY = 20;
 
 export interface SearchParams {
   keyword: string;
@@ -60,37 +47,12 @@ const defaultParams: SearchParams = {
   format: "xlsx",
 };
 
-interface HistoryEntry extends SearchParams {
-  timestamp: number;
-}
-
-function loadHistory(): HistoryEntry[] {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as HistoryEntry[];
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_HISTORY) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveToHistory(entry: HistoryEntry) {
-  const list = loadHistory();
-  const next = [entry, ...list.filter((e) => e.keyword !== entry.keyword || e.timestamp !== entry.timestamp)].slice(
-    0,
-    MAX_HISTORY
-  );
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-}
-
 export default function App() {
   const [params, setParams] = useState<SearchParams>(defaultParams);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -106,22 +68,6 @@ export default function App() {
     updateParams({ keyword });
     setSidebarOpen(false);
   }, [updateParams]);
-
-  const applyHistoryEntry = useCallback((entry: HistoryEntry) => {
-    setParams({
-      keyword: entry.keyword,
-      exact_phrase: entry.exact_phrase,
-      sortby: entry.sortby,
-      start_year: entry.start_year,
-      end_year: entry.end_year,
-      langfilter: entry.langfilter ?? [],
-      nresults: entry.nresults ?? 100,
-      format: entry.format ?? "xlsx",
-    });
-    setSidebarOpen(false);
-    setError(null);
-    setDownloadUrl(null);
-  }, []);
 
   const runSearch = useCallback(async () => {
     const keyword = params.keyword.trim();
@@ -155,12 +101,6 @@ export default function App() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       setDownloadUrl(url);
-      saveToHistory({
-        ...params,
-        keyword: params.keyword.trim(),
-        timestamp: Date.now(),
-      });
-      setHistory(loadHistory());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al generar el informe.");
     } finally {
@@ -193,41 +133,6 @@ export default function App() {
         `}
       >
         <div className="flex flex-col h-full pt-16 md:pt-6 pb-6 px-4 overflow-y-auto">
-          <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-3">
-            Historial
-          </h2>
-          <ul className="space-y-1 mb-6">
-            {history.length === 0 && (
-              <li className="text-sm text-neutral-400 dark:text-neutral-500">Sin búsquedas recientes</li>
-            )}
-            {history.slice(0, 10).map((entry, i) => (
-              <li key={`${entry.timestamp}-${i}`}>
-                <button
-                  type="button"
-                  onClick={() => applyHistoryEntry(entry)}
-                  className="text-left text-sm w-full px-3 py-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 truncate"
-                >
-                  {entry.keyword}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-3">
-            En tendencia
-          </h2>
-          <ul className="space-y-1 mb-6">
-            {TRENDING.map((q) => (
-              <li key={q}>
-                <button
-                  type="button"
-                  onClick={() => applySuggestion(q)}
-                  className="text-left text-sm w-full px-3 py-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                >
-                  {q}
-                </button>
-              </li>
-            ))}
-          </ul>
           <h2 className="text-sm font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-3">
             Accesos rápidos
           </h2>
@@ -263,7 +168,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              aria-label="Abrir panel de historial y sugerencias"
+              aria-label="Abrir accesos rápidos"
               className="md:hidden p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800"
               onClick={() => setSidebarOpen(true)}
             >
