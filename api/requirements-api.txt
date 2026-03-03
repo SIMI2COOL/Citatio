@@ -1,0 +1,4 @@
+# API layer for sortgs web app (install in addition to sortgs)
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+openpyxl>=3.1.0

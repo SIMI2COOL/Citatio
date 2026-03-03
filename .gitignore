@@ -26,3 +26,7 @@ ipython_config.py
 *.egg-info
 dist
 build
+
+# Frontend
+web/node_modules
+web/dist

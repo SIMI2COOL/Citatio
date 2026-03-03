@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --color-accent: #800020;
+  --color-accent-hover: #a00028;
+  --bg-sidebar: rgba(255, 255, 255, 0.03);
+  --border-sidebar: rgba(255, 255, 255, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-sidebar: rgba(0, 0, 0, 0.2);
+    --border-sidebar: rgba(255, 255, 255, 0.06);
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}

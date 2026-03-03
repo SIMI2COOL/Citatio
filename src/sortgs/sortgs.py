@@ -19,6 +19,8 @@ a .csv file.
 import requests
 import datetime
 import argparse
+from typing import Optional, Union
+
 from bs4 import BeautifulSoup
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -261,51 +263,55 @@ def get_pdf_link(div):
             a_tag = pdf_div.find("a")
             if a_tag:
                 return a_tag.get("href")
-    except:
+    except Exception:
         pass
     return None
 
 
-def main():
-    # Get command line arguments
-    (
+def run_search(
+    keyword: str,
+    nresults: int = NRESULTS,
+    sortby: str = SORTBY,
+    start_year: Optional[int] = STARTYEAR,
+    end_year: Optional[int] = None,
+    langfilter: Union[str, list] = LANG,
+    debug: bool = DEBUG,
+) -> pd.DataFrame:
+    """
+    Run a Google Scholar search and return results as a sorted DataFrame.
+    Can be called programmatically (e.g. from an API) without CLI args.
+    """
+    if end_year is None:
+        end_year = now.year
+
+    logger.info(
+        "Running with parameters: Keyword: %s, nresults: %s, sortby: %s, "
+        "langfilter: %s, start_year: %s, end_year: %s, debug: %s",
         keyword,
-        number_of_results,
-        save_database,
-        path,
-        sortby_column,
+        nresults,
+        sortby,
         langfilter,
-        plot_results,
         start_year,
         end_year,
         debug,
-    ) = get_command_line_args()
-
-    logger.info(
-        f"Running with parameters: Keyword: {keyword}, Number of results: {number_of_results}, Save database: {save_database}, Path: {path}, Sort by: {sortby_column}, Permitted Languages: {langfilter}, Plot results: {plot_results}, Start year: {start_year}, End year: {end_year}, Debug: {debug}"
     )
 
-    # Create main URL based on command line arguments
     if start_year:
-        GSCHOLAR_MAIN_URL = GSCHOLAR_URL + STARTYEAR_URL.format(start_year)
+        gscholar_main_url = GSCHOLAR_URL + STARTYEAR_URL.format(start_year)
     else:
-        GSCHOLAR_MAIN_URL = GSCHOLAR_URL
+        gscholar_main_url = GSCHOLAR_URL
 
     if end_year != now.year:
-        GSCHOLAR_MAIN_URL = GSCHOLAR_MAIN_URL + ENDYEAR_URL.format(end_year)
+        gscholar_main_url = gscholar_main_url + ENDYEAR_URL.format(end_year)
 
     if langfilter != "All":
         formatted_filters = format_strings(langfilter)
-        GSCHOLAR_MAIN_URL = GSCHOLAR_MAIN_URL + LANG_URL.format(formatted_filters)
+        gscholar_main_url = gscholar_main_url + LANG_URL.format(formatted_filters)
 
     if debug:
-        GSCHOLAR_MAIN_URL = "https://web.archive.org/web/20210314203256/" + GSCHOLAR_URL
+        gscholar_main_url = "https://web.archive.org/web/20210314203256/" + GSCHOLAR_URL
 
-    # Start new session
     session = requests.Session()
-    # headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
-
-    # Variables
     links = []
     title = []
     citations = []
@@ -313,71 +319,53 @@ def main():
     author = []
     venue = []
     publisher = []
-    content = []  # Add new list for content
-    pdf_links = []  # New list for PDF links
+    content = []
+    pdf_links = []
     rank = [0]
 
-    # Get content from number_of_results URLs
-    for n in range(0, number_of_results, 10):
-        # if start_year is None:
-        url = GSCHOLAR_MAIN_URL.format(str(n), keyword.replace(" ", "+"))
+    for n in range(0, nresults, 10):
+        url = gscholar_main_url.format(str(n), keyword.replace(" ", "+"))
         if debug:
             logger.debug("Opening URL: %s", url)
-        # else:
-        #    url=GSCHOLAR_URL_YEAR.format(str(n), keyword.replace(' ','+'), start_year=start_year, end_year=end_year)
-
         logger.info("Loading next %d results", n + 10)
-        page = session.get(url)  # , headers=headers)
+        page = session.get(url)
         c = page.content
         if any(kw in c.decode("ISO-8859-1") for kw in ROBOT_KW):
             logger.warning("Robot check detected, using Selenium fallback")
             try:
                 c = get_content_with_selenium(url)
-            except Exception as e:
-                logger.exception(
-                    "Failed to fetch content with Selenium for URL: %s", url
-                )
+            except Exception:
+                logger.exception("Failed to fetch content with Selenium for URL: %s", url)
 
-        # Create parser
         soup = BeautifulSoup(c, "html.parser", from_encoding="utf-8")
-
-        # Get stuff
         mydivs = soup.findAll("div", {"class": "gs_or"})
         for div in mydivs:
             try:
                 links.append(div.find("h3").find("a").get("href"))
-            except:  # catch *all* exceptions
+            except Exception:
                 links.append("Look manually at: " + url)
-
             try:
                 title.append(div.find("h3").find("a").text)
-            except:
+            except Exception:
                 title.append("Could not catch title")
-
             try:
                 citations.append(get_citations(str(div.format_string)))
-            except:
-                logger.warning(
-                    "Number of citations not found for %s. Appending 0", title[-1]
-                )
+            except Exception:
+                logger.warning("Number of citations not found for %s. Appending 0", title[-1])
                 citations.append(0)
-
             try:
                 year.append(get_year(div.find("div", {"class": "gs_a"}).text))
-            except:
+            except Exception:
                 logger.warning("Year not found for %s, appending 0", title[-1])
                 year.append(0)
-
             try:
                 author.append(get_author(div.find("div", {"class": "gs_a"}).text))
-            except:
+            except Exception:
                 author.append("Author not found")
-
             try:
                 publisher.append(div.find("div", {"class": "gs_a"}).text.split("-")[-1])
-            except:
+            except Exception:
                 publisher.append("Publisher not found")
-
             try:
                 venue.append(
                     " ".join(
@@ -386,24 +374,17 @@ def main():
                         .split(",")[:-1]
                     )
                 )
-            except:
+            except Exception:
                 venue.append("Venue not fount")
-
             try:
                 content_div = div.find("div", {"class": "gs_rs"})
                 content.append(content_div.text if content_div else "Content not found")
-            except:
+            except Exception:
                 content.append("Content not found")
-
-            # Extract PDF link
             pdf_links.append(get_pdf_link(div) or "No PDF link")
-
             rank.append(rank[-1] + 1)
-
-        # Delay
         sleep(random.uniform(0.5, 3))
 
-    # Create a dataset and sort by the number of citations
     data = pd.DataFrame(
         list(
             zip(
@@ -432,39 +413,75 @@ def main():
         ],
     )
     data.index.name = "Rank"
-
-    # Avoid years that are higher than the current year by clipping it to end_year
     data["cit/year"] = data["Citations"] / (
         end_year + 1 - data["Year"].clip(upper=end_year)
     )
     data["cit/year"] = data["cit/year"].round(0).astype(int)
 
-    # Sort by the selected columns, if exists
     try:
-        data_ranked = data.sort_values(by=sortby_column, ascending=False)
+        data_ranked = data.sort_values(by=sortby, ascending=False)
     except Exception as e:
         logger.warning(
-            "Sort column '%s' not found. Falling back to 'Citations'", sortby_column
+            "Sort column '%s' not found. Falling back to 'Citations'", sortby
         )
         data_ranked = data.sort_values(by="Citations", ascending=False)
         logger.debug("Sorting error details: %s", e)
 
-    # Print data
     logger.info("Results:\n%s", data_ranked.to_string())
+    return data_ranked
 
-    # Plot by citation number
+
+def main():
+    (
+        keyword,
+        number_of_results,
+        save_database,
+        path,
+        sortby_column,
+        langfilter,
+        plot_results,
+        start_year,
+        end_year,
+        debug,
+    ) = get_command_line_args()
+
+    logger.info(
+        "Running with parameters: Keyword: %s, Number of results: %s, Save database: %s, "
+        "Path: %s, Sort by: %s, Permitted Languages: %s, Plot results: %s, "
+        "Start year: %s, End year: %s, Debug: %s",
+        keyword,
+        number_of_results,
+        save_database,
+        path,
+        sortby_column,
+        langfilter,
+        plot_results,
+        start_year,
+        end_year,
+        debug,
+    )
+
+    data_ranked = run_search(
+        keyword=keyword,
+        nresults=number_of_results,
+        sortby=sortby_column,
+        start_year=start_year,
+        end_year=end_year,
+        langfilter=langfilter,
+        debug=debug,
+    )
+
     if plot_results:
-        plt.plot(rank[1:], citations, "*")
+        rank_vals = list(range(1, len(data_ranked) + 1))
+        plt.plot(rank_vals, data_ranked["Citations"].tolist(), "*")
         plt.ylabel("Number of Citations")
         plt.xlabel("Rank of the keyword on Google Scholar")
         plt.title("Keyword: " + keyword)
         plt.show()
 
-    # Save results
     if save_database:
         csv_file_name = f"{keyword.replace(' ', '_').replace(':', '_')}.csv"
         csv_path = Path(path) / csv_file_name
-        # Truncate filename if too long
         if len(csv_path.name) > MAX_CSV_FNAME:
             csv_path = csv_path.with_name(csv_path.name[:MAX_CSV_FNAME])
         data_ranked.to_csv(csv_path, encoding="utf-8")

@@ -10,6 +10,27 @@ sortgs is a Python tool for ranking Google Scholar publications by the number of
 > 💡 **All you need** is a Google Account to get started.  
 > ⚠️ **Note**: Google Scholar may block access after too many repetitive requests due to CAPTCHA checks, so proceed mindfully!
 
+## Citatio – Web app (local)
+
+A modern web interface (Citatio) lets you run searches from the browser and download results as Excel or CSV.
+
+1. **From the project root**, install the package and API dependencies:
+   ```bash
+   pip install -e .
+   pip install -r api/requirements-api.txt
+   ```
+2. **Start the API** (from the project root):
+   ```bash
+   uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+   ```
+3. **In another terminal**, start the frontend:
+   ```bash
+   cd web && npm install && npm run dev
+   ```
+4. Open **http://localhost:5173** in your browser. Use the search box and filters, then click “Buscar y exportar” to generate and download the file.
+
+The frontend proxies `/api` to the backend; ensure the API is running on port 8000 when using the dev server.
+
 ## 📚 Colab No-Code Instructions
 https://github.com/user-attachments/assets/25de7bad-2a5d-4bcf-b486-faa1d7a29eb3
 
