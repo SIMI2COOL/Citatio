@@ -1,9 +1,4 @@
 {
   "installCommand": "cd web && npm install && cd .. && pip install -r requirements.txt",
-  "buildCommand": "cd web && npm run build",
-  "functions": {
-    "server.py": {
-      "excludeFiles": "web/node_modules/**"
-    }
-  }
+  "buildCommand": "cd web && npm run build"
 }
