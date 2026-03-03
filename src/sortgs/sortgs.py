@@ -22,7 +22,6 @@ import argparse
 from typing import Optional, Union
 
 from bs4 import BeautifulSoup
-import matplotlib.pyplot as plt
 import pandas as pd
 from time import sleep
 import random
@@ -30,12 +29,6 @@ import re
 import logging
 import sys
 from pathlib import Path
-
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 # Removed Python 2 compatibility for raw_input; using input() directly
 
@@ -198,8 +191,11 @@ def get_year(content: str) -> int:
     return int(match.group(0)) if match else 0
 
 
-def setup_driver() -> webdriver.Chrome:
+def setup_driver():
     logger.info("Initializing WebDriver")
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+
     chrome_options = Options()
     chrome_options.add_argument("disable-infobars")
     driver = webdriver.Chrome(options=chrome_options)
@@ -214,6 +210,8 @@ def get_author(content: str) -> str:
 
 def get_element(driver, xpath: str, attempts: int = 5, _count: int = 0):
     """Safely find an element by xpath with retries using updated selenium API."""
+    from selenium.webdriver.common.by import By
+
     try:
         return driver.find_element(By.XPATH, xpath)
     except Exception:
@@ -225,6 +223,10 @@ def get_element(driver, xpath: str, attempts: int = 5, _count: int = 0):
 
 
 def get_content_with_selenium(url):
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+
     if "driver" not in globals():
         global driver
         driver = setup_driver()
@@ -276,6 +278,7 @@ def run_search(
     end_year: Optional[int] = None,
     langfilter: Union[str, list] = LANG,
     debug: bool = DEBUG,
+    allow_selenium: bool = True,
 ) -> pd.DataFrame:
     """
     Run a Google Scholar search and return results as a sorted DataFrame.
@@ -330,7 +333,7 @@ def run_search(
         logger.info("Loading next %d results", n + 10)
         page = session.get(url)
         c = page.content
-        if any(kw in c.decode("ISO-8859-1") for kw in ROBOT_KW):
+        if allow_selenium and any(kw in c.decode("ISO-8859-1") for kw in ROBOT_KW):
             logger.warning("Robot check detected, using Selenium fallback")
             try:
                 c = get_content_with_selenium(url)
@@ -472,6 +475,8 @@ def main():
     )
 
     if plot_results:
+        import matplotlib.pyplot as plt
+
         rank_vals = list(range(1, len(data_ranked) + 1))
         plt.plot(rank_vals, data_ranked["Citations"].tolist(), "*")
         plt.ylabel("Number of Citations")
