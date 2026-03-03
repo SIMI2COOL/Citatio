@@ -1,5 +1,5 @@
-requests
-beautifulsoup4
-pandas
-matplotlib
-selenium
+# Vercel / production: install sortgs and API deps
+-e .
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+openpyxl>=3.1.0

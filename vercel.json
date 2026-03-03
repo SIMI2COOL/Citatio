@@ -1,8 +1,9 @@
 {
-  "installCommand": "cd web && npm install",
+  "installCommand": "cd web && npm install && cd .. && pip install -r requirements.txt",
   "buildCommand": "cd web && npm run build",
-  "outputDirectory": "web/dist",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  "functions": {
+    "server.py": {
+      "excludeFiles": "web/node_modules/**"
+    }
+  }
 }
