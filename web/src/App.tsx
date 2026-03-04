@@ -94,6 +94,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      const contentType = res.headers.get("content-type") || "";
       if (!res.ok) {
         const t = await res.text();
         let msg = t || `Error ${res.status}`;
@@ -102,6 +103,18 @@ export default function App() {
           if (typeof j?.error === "string") msg = j.error;
         } catch {
           /* use t as msg */
+        }
+        throw new Error(msg);
+      }
+      // Solo usar como descarga si la API devolvió CSV (resultado de la búsqueda), no HTML ni otro contenido
+      if (!contentType.includes("text/csv") && !contentType.includes("application/csv")) {
+        const t = await res.text();
+        let msg = "La respuesta no es un CSV de búsqueda. Comprueba que la API esté activa.";
+        try {
+          const j = JSON.parse(t) as { error?: string };
+          if (typeof j?.error === "string") msg = j.error;
+        } catch {
+          if (t.slice(0, 50).includes("<!") || t.slice(0, 50).includes("<html")) msg = "Se recibió la página en lugar del CSV. Configura la API (Root Directory = web).";
         }
         throw new Error(msg);
       }
@@ -367,7 +380,7 @@ export default function App() {
                 <p className="text-green-800 dark:text-green-200 font-medium mb-2">Informe listo</p>
                 <a
                   href={downloadUrl}
-                  download={`scholar_export.${params.format}`}
+                  download={`${params.keyword.trim().replace(/[\s:]+/g, "_").slice(0, 80) || "scholar_export"}.${params.format}`}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 font-medium"
                 >
                   Descargar {params.format === "xlsx" ? "Excel" : "CSV"}

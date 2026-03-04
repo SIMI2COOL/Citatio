@@ -124,6 +124,10 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             return _json_response(self, 502, {"error": f"Search failed: {str(e)}"})
 
+        # Solo generar CSV con los resultados reales de la búsqueda (no devolver nada genérico)
+        if not rows:
+            return _json_response(self, 502, {"error": "Google Scholar no devolvió resultados para esta búsqueda. Prueba otra palabra clave o más tarde."})
+
         base_name = _sanitize_filename(keyword.replace("'", ""))
         buf = io.StringIO()
         writer = csv.writer(buf)
