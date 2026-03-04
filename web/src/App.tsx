@@ -96,7 +96,14 @@ export default function App() {
       });
       if (!res.ok) {
         const t = await res.text();
-        throw new Error(t || `Error ${res.status}`);
+        let msg = t || `Error ${res.status}`;
+        try {
+          const j = JSON.parse(t) as { error?: string };
+          if (typeof j?.error === "string") msg = j.error;
+        } catch {
+          /* use t as msg */
+        }
+        throw new Error(msg);
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

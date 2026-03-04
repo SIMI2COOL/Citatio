@@ -2,6 +2,11 @@
   "installCommand": "cd web && npm install",
   "buildCommand": "cd web && npm run build",
   "outputDirectory": "web/dist",
+  "functions": {
+    "api/*.py": {
+      "includeFiles": "src/**"
+    }
+  },
   "rewrites": [
     { "source": "/:path((?!api/).*)", "destination": "/index.html" }
   ]

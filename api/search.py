@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import re
 import sys
 from http.server import BaseHTTPRequestHandler
@@ -7,16 +8,25 @@ from pathlib import Path
 
 import pandas as pd
 
-# Make local src/ importable in Vercel Functions
-ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-from sortgs.sortgs import run_search  # noqa: E402
-
-
 MAX_CSV_FNAME = 255
+
+
+def _get_run_search():
+    """Import run_search so src/ is on path and sortgs is available (Vercel bundles includeFiles: src/**)."""
+    root = Path(__file__).resolve().parent.parent
+    src = root / "src"
+    cwd = Path(os.getcwd())
+    for base in (root, cwd, root.parent):
+        s = base / "src"
+        if (s / "sortgs" / "sortgs.py").exists():
+            if str(s) not in sys.path:
+                sys.path.insert(0, str(s))
+            break
+    else:
+        if str(src) not in sys.path:
+            sys.path.insert(0, str(src))
+    from sortgs.sortgs import run_search  # noqa: E402
+    return run_search
 
 
 def _sanitize_filename(s: str) -> str:
@@ -42,6 +52,12 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        try:
+            return self._do_post_impl()
+        except Exception as e:
+            _json_response(self, 500, {"error": f"Server error: {type(e).__name__}: {str(e)}"})
+
+    def _do_post_impl(self):
         try:
             length = int(self.headers.get("Content-Length", "0"))
             raw = self.rfile.read(length) if length > 0 else b"{}"
@@ -83,12 +99,16 @@ class handler(BaseHTTPRequestHandler):
             nresults = int(nresults)
         except Exception:
             nresults = 100
-        # Keep within reasonable limits for serverless runtime
         nresults = max(10, min(50, nresults))
 
         fmt = str(data.get("format", "xlsx")).lower()
         if fmt not in ("xlsx", "csv"):
             fmt = "xlsx"
+
+        try:
+            run_search = _get_run_search()
+        except Exception as e:
+            return _json_response(self, 500, {"error": f"Import failed: {type(e).__name__}: {str(e)}"})
 
         try:
             df = run_search(
