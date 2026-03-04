@@ -136,8 +136,8 @@ def run_search_semantic_scholar(
     if not query:
         return (HEADERS, [])
 
-    # Terms for filtering: only keep papers that contain these (avoids irrelevant API results).
-    filter_terms = [w for w in query.strip("'\"").lower().split() if len(w) > 1]
+    # No filtrar manualmente: Semantic Scholar ya rankea por relevancia.
+    # Filtrar por "all terms in text" descartaba papers válidos con abstracts en otro idioma.
 
     params: Any = {
         "query": query,
@@ -169,10 +169,6 @@ def run_search_semantic_scholar(
         for p in all_data:
             title = (p.get("title") or "No title").strip()
             abstract = (p.get("abstract") or "").strip() or "—"
-            if filter_terms:
-                text = (title + " " + abstract).lower()
-                if not all(term in text for term in filter_terms):
-                    continue
             year_val = p.get("year")
             year = int(year_val) if year_val is not None else 0
             citations = int(p.get("citationCount") or 0)

@@ -101,7 +101,7 @@ class handler(BaseHTTPRequestHandler):
             nresults = int(nresults)
         except Exception:
             nresults = 100
-        nresults = max(10, min(30, nresults))
+        nresults = max(10, min(100, nresults))
 
         fmt = str(data.get("format", "csv")).lower()
         if fmt not in ("xlsx", "csv"):
