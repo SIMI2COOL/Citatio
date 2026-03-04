@@ -5,6 +5,7 @@ Returns (headers, rows) for CSV output.
 import datetime
 import re
 from typing import List, Optional, Tuple, Union
+from urllib.parse import quote_plus
 
 import requests
 from bs4 import BeautifulSoup
@@ -14,6 +15,25 @@ STARTYEAR_URL = "&as_ylo={}"
 ENDYEAR_URL = "&as_yhi={}"
 LANG_URL = "&lr={}"
 NOW = datetime.datetime.now()
+
+# Keywords that indicate Google blocked the request (CAPTCHA / rate limit).
+ROBOT_BLOCK_KEYWORDS = [
+    "unusual traffic from your computer network",
+    "not a robot",
+    "sorry, you have been blocked",
+    "captcha",
+    "automated requests",
+]
+
+# Browser-like headers so Google is less likely to return a block page.
+REQUEST_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
 HEADERS = ["Rank", "Author", "Title", "Citations", "Year", "Publisher", "Venue", "Content", "Source", "PDF", "cit/year"]
 
@@ -79,19 +99,34 @@ def run_search(
         url = "https://web.archive.org/web/20210314203256/" + GSCHOLAR_URL
 
     session = requests.Session()
+    session.headers.update(REQUEST_HEADERS)
     rows: List[List] = []
     rank = 0
 
+    # Encode query for URL (spaces as +, special chars escaped).
+    query_encoded = quote_plus(keyword)
+
     for n in range(0, nresults, 10):
-        page_url = url.format(str(n), keyword.replace(" ", "+"))
+        page_url = url.format(str(n), query_encoded)
         try:
             page = session.get(page_url, timeout=request_timeout)
             c = page.content
         except Exception as e:
             raise RuntimeError(f"Request failed: {e}") from e
 
+        try:
+            page_text = c.decode("utf-8", errors="replace")
+        except Exception:
+            page_text = c.decode("ISO-8859-1", errors="replace")
+        if any(block_kw in page_text.lower() for block_kw in ROBOT_BLOCK_KEYWORDS):
+            raise RuntimeError(
+                "Google Scholar está bloqueando peticiones automáticas (CAPTCHA/límite). "
+                "Prueba más tarde, con otra red o con menos búsquedas seguidas."
+            )
+
         soup = BeautifulSoup(c, "html.parser", from_encoding="utf-8")
-        for div in soup.findAll("div", {"class": "gs_or"}):
+        # Match result divs: class can be "gs_or" or "gs_r gs_or gs_scl"
+        for div in soup.findAll("div", {"class": re.compile(r"gs_or")}):
             rank += 1
             try:
                 link = div.find("h3").find("a").get("href")

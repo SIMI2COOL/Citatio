@@ -119,14 +119,21 @@ class handler(BaseHTTPRequestHandler):
                 langfilter=langfilter_val,
                 debug=False,
                 delay_seconds=0,
-                request_timeout=8,
+                request_timeout=15,
             )
         except Exception as e:
-            return _json_response(self, 502, {"error": f"Search failed: {str(e)}"})
+            return _json_response(self, 502, {"error": str(e)})
 
         # Solo generar CSV con los resultados reales de la búsqueda (no devolver nada genérico)
         if not rows:
-            return _json_response(self, 502, {"error": "Google Scholar no devolvió resultados para esta búsqueda. Prueba otra palabra clave o más tarde."})
+            return _json_response(
+                self,
+                502,
+                {
+                    "error": "Google Scholar no devolvió resultados para esta búsqueda. "
+                    "Puede ser bloqueo por uso automático; prueba otra palabra clave, más tarde o desde otra red."
+                },
+            )
 
         base_name = _sanitize_filename(keyword.replace("'", ""))
         buf = io.StringIO()
