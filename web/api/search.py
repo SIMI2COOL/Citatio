@@ -76,8 +76,7 @@ class handler(BaseHTTPRequestHandler):
             return _json_response(self, 400, {"error": "keyword is required"})
 
         exact_phrase = bool(data.get("exact_phrase", False))
-        if exact_phrase:
-            keyword = f"'{keyword}'"
+        phrase = keyword.strip().strip("'\"") if exact_phrase else None
 
         sortby = data.get("sortby", "Citations")
         if sortby not in ("Citations", "cit/year"):
@@ -125,6 +124,11 @@ class handler(BaseHTTPRequestHandler):
             )
         except Exception as e:
             return _json_response(self, 502, {"error": str(e)})
+
+        if exact_phrase and phrase:
+            lowered = phrase.lower()
+            # Título está en la columna 2 según HEADERS del runner
+            rows = [row for row in rows if lowered in str(row[2]).lower()]
 
         if not rows:
             return _json_response(
