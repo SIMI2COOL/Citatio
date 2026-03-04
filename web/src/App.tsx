@@ -44,7 +44,7 @@ const defaultParams: SearchParams = {
   end_year: "",
   langfilter: [],
   nresults: 100,
-  format: "xlsx",
+  format: "csv",
 };
 
 export default function App() {
@@ -299,7 +299,7 @@ export default function App() {
                   className="px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
                 >
                   <option value="xlsx">Excel (.xlsx)</option>
-                  <option value="csv">CSV (.csv)</option>
+                  <option value="csv">CSV (.csv) — versión web</option>
                 </select>
               </div>
             </div>

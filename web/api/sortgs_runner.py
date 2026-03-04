@@ -1,12 +1,11 @@
 """
-Self-contained Google Scholar search for Vercel serverless (no dependency on src/sortgs).
-Uses only requests, BeautifulSoup, pandas. No selenium. Optional delay between requests.
+Google Scholar search for Vercel serverless. No pandas — only requests + BeautifulSoup.
+Returns (headers, rows) for CSV output.
 """
 import datetime
 import re
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
-import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
@@ -15,6 +14,8 @@ STARTYEAR_URL = "&as_ylo={}"
 ENDYEAR_URL = "&as_yhi={}"
 LANG_URL = "&lr={}"
 NOW = datetime.datetime.now()
+
+HEADERS = ["Rank", "Author", "Title", "Citations", "Year", "Publisher", "Venue", "Content", "Source", "PDF", "cit/year"]
 
 
 def _get_citations(content: str) -> int:
@@ -60,8 +61,8 @@ def run_search(
     debug: bool = False,
     delay_seconds: float = 0,
     request_timeout: float = 15,
-) -> pd.DataFrame:
-    """Run Scholar search; no selenium. delay_seconds=0 for serverless to avoid timeout."""
+) -> Tuple[List[str], List[List]]:
+    """Run Scholar search. Returns (headers, rows) for CSV. No pandas."""
     from time import sleep
 
     if end_year is None:
@@ -78,9 +79,8 @@ def run_search(
         url = "https://web.archive.org/web/20210314203256/" + GSCHOLAR_URL
 
     session = requests.Session()
-    links, title, citations, year = [], [], [], []
-    author, venue, publisher, content, pdf_links = [], [], [], [], []
-    rank = [0]
+    rows: List[List] = []
+    rank = 0
 
     for n in range(0, nresults, 10):
         page_url = url.format(str(n), keyword.replace(" ", "+"))
@@ -92,65 +92,53 @@ def run_search(
 
         soup = BeautifulSoup(c, "html.parser", from_encoding="utf-8")
         for div in soup.findAll("div", {"class": "gs_or"}):
+            rank += 1
             try:
-                links.append(div.find("h3").find("a").get("href"))
+                link = div.find("h3").find("a").get("href")
             except Exception:
-                links.append("Look manually at: " + page_url)
+                link = "Look manually at: " + page_url
             try:
-                title.append(div.find("h3").find("a").text)
+                title = div.find("h3").find("a").text
             except Exception:
-                title.append("Could not catch title")
+                title = "Could not catch title"
             try:
-                citations.append(_get_citations(str(div)))
+                citations = _get_citations(str(div))
             except Exception:
-                citations.append(0)
+                citations = 0
             try:
-                year.append(_get_year(div.find("div", {"class": "gs_a"}).text))
+                year = _get_year(div.find("div", {"class": "gs_a"}).text)
             except Exception:
-                year.append(0)
+                year = 0
             try:
-                author.append(_get_author(div.find("div", {"class": "gs_a"}).text))
+                author = _get_author(div.find("div", {"class": "gs_a"}).text)
             except Exception:
-                author.append("Author not found")
+                author = "Author not found"
             try:
-                publisher.append(div.find("div", {"class": "gs_a"}).text.split("-")[-1])
+                publisher = div.find("div", {"class": "gs_a"}).text.split("-")[-1]
             except Exception:
-                publisher.append("Publisher not found")
+                publisher = "Publisher not found"
             try:
-                venue.append(
-                    " ".join(
-                        div.find("div", {"class": "gs_a"})
-                        .text.split("-")[-2]
-                        .split(",")[:-1]
-                    )
+                venue = " ".join(
+                    div.find("div", {"class": "gs_a"}).text.split("-")[-2].split(",")[:-1]
                 )
             except Exception:
-                venue.append("Venue not found")
+                venue = "Venue not found"
             try:
                 content_div = div.find("div", {"class": "gs_rs"})
-                content.append(content_div.text if content_div else "Content not found")
+                content = content_div.text if content_div else "Content not found"
             except Exception:
-                content.append("Content not found")
-            pdf_links.append(_get_pdf_link(div) or "No PDF link")
-            rank.append(rank[-1] + 1)
+                content = "Content not found"
+            pdf = _get_pdf_link(div) or "No PDF link"
+
+            denom = end_year + 1 - min(year, end_year)
+            cit_per_year = int(round(citations / denom)) if denom > 0 else 0
+            rows.append([rank, author, title, citations, year, publisher, venue, content, link, pdf, cit_per_year])
         if delay_seconds > 0:
             sleep(delay_seconds)
 
-    data = pd.DataFrame(
-        list(zip(author, title, citations, year, publisher, venue, content, links, pdf_links)),
-        index=rank[1:],
-        columns=[
-            "Author", "Title", "Citations", "Year", "Publisher", "Venue",
-            "Content", "Source", "PDF",
-        ],
-    )
-    data.index.name = "Rank"
-    data["cit/year"] = data["Citations"] / (
-        end_year + 1 - data["Year"].clip(upper=end_year)
-    )
-    data["cit/year"] = data["cit/year"].round(0).astype(int)
-    try:
-        data_ranked = data.sort_values(by=sortby, ascending=False)
-    except Exception:
-        data_ranked = data.sort_values(by="Citations", ascending=False)
-    return data_ranked
+    # Sort: 3=Citations, 10=cit/year
+    sort_idx = 10 if sortby == "cit/year" else 3
+    rows.sort(key=lambda r: r[sort_idx], reverse=True)
+    for i, row in enumerate(rows, 1):
+        row[0] = i
+    return (HEADERS, rows)

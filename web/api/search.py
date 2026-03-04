@@ -1,3 +1,4 @@
+import csv
 import io
 import json
 import re
@@ -5,7 +6,7 @@ import sys
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
-# Heavy imports deferred to request time so import failures return 500 instead of FUNCTION_INVOCATION_FAILED
+# No pandas/openpyxl — only stdlib + sortgs_runner (requests, beautifulsoup4)
 MAX_CSV_FNAME = 255
 
 
@@ -23,22 +24,20 @@ def _json_response(handler: BaseHTTPRequestHandler, status: int, payload: dict):
     handler.wfile.write(body)
 
 
-def _load_deps():
-    """Load pandas and sortgs_runner; raise on failure."""
-    import pandas as pd  # noqa: F401
+def _load_runner():
+    """Load sortgs_runner only (requests + bs4). No pandas."""
     _api_dir = Path(__file__).resolve().parent
     if str(_api_dir) not in sys.path:
         sys.path.insert(0, str(_api_dir))
     import sortgs_runner  # noqa: E402
-    return pd, sortgs_runner.run_search
+    return sortgs_runner.run_search
 
 
 class handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
-        pass  # avoid stderr output that can interfere on serverless
+        pass
 
     def do_GET(self):
-        """Health check so we can confirm the function is deployed."""
         _json_response(self, 200, {"status": "ok", "service": "search"})
         return
 
@@ -58,7 +57,7 @@ class handler(BaseHTTPRequestHandler):
 
     def _do_post_impl(self):
         try:
-            pd, run_search = _load_deps()
+            run_search = _load_runner()
         except Exception as e:
             return _json_response(self, 500, {"error": f"Dependency load failed: {type(e).__name__}: {str(e)}"})
         try:
@@ -102,15 +101,16 @@ class handler(BaseHTTPRequestHandler):
             nresults = int(nresults)
         except Exception:
             nresults = 100
-        # Cap at 30 for serverless (3 pages) to stay within Vercel maxDuration
         nresults = max(10, min(30, nresults))
 
-        fmt = str(data.get("format", "xlsx")).lower()
+        fmt = str(data.get("format", "csv")).lower()
         if fmt not in ("xlsx", "csv"):
-            fmt = "xlsx"
+            fmt = "csv"
+        if fmt == "xlsx":
+            return _json_response(self, 400, {"error": "En la versión web solo está disponible descarga en CSV. Elige formato CSV."})
 
         try:
-            df = run_search(
+            headers, rows = run_search(
                 keyword=keyword,
                 nresults=nresults,
                 sortby=sortby,
@@ -125,34 +125,16 @@ class handler(BaseHTTPRequestHandler):
             return _json_response(self, 502, {"error": f"Search failed: {str(e)}"})
 
         base_name = _sanitize_filename(keyword.replace("'", ""))
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(headers)
+        writer.writerows(rows)
+        payload = buf.getvalue().encode("utf-8")
+
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
-
-        if fmt == "csv":
-            buf = io.StringIO()
-            df.to_csv(buf, encoding="utf-8", index=True)
-            payload = buf.getvalue().encode("utf-8")
-            self.send_header("Content-Type", "text/csv; charset=utf-8")
-            self.send_header(
-                "Content-Disposition", f'attachment; filename="{base_name}.csv"'
-            )
-            self.send_header("Content-Length", str(len(payload)))
-            self.end_headers()
-            self.wfile.write(payload)
-            return
-
-        # xlsx
-        b = io.BytesIO()
-        with pd.ExcelWriter(b, engine="openpyxl") as writer:
-            df.to_excel(writer, sheet_name="Results", index=True)
-        payload = b.getvalue()
-        self.send_header(
-            "Content-Type",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-        self.send_header(
-            "Content-Disposition", f'attachment; filename="{base_name}.xlsx"'
-        )
+        self.send_header("Content-Type", "text/csv; charset=utf-8")
+        self.send_header("Content-Disposition", f'attachment; filename="{base_name}.csv"')
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
