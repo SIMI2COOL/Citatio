@@ -352,7 +352,7 @@ def run_search(
             except Exception:
                 title.append("Could not catch title")
             try:
-                citations.append(get_citations(str(div.format_string)))
+                citations.append(get_citations(str(div)))
             except Exception:
                 logger.warning("Number of citations not found for %s. Appending 0", title[-1])
                 citations.append(0)

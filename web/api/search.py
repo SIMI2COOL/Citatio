@@ -6,7 +6,8 @@ import sys
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
-# No pandas/openpyxl — only stdlib + sortgs_runner (requests, beautifulsoup4)
+from openpyxl import Workbook
+
 MAX_CSV_FNAME = 255
 
 
@@ -30,6 +31,7 @@ def _load_runner():
     if str(_api_dir) not in sys.path:
         sys.path.insert(0, str(_api_dir))
     import sortgs_runner  # noqa: E402
+
     return sortgs_runner.run_search_semantic_scholar
 
 
@@ -59,7 +61,9 @@ class handler(BaseHTTPRequestHandler):
         try:
             run_search = _load_runner()
         except Exception as e:
-            return _json_response(self, 500, {"error": f"Dependency load failed: {type(e).__name__}: {str(e)}"})
+            return _json_response(
+                self, 500, {"error": f"Dependency load failed: {type(e).__name__}: {str(e)}"}
+            )
         try:
             length = int(self.headers.get("Content-Length", "0"))
             raw = self.rfile.read(length) if length > 0 else b"{}"
@@ -106,8 +110,6 @@ class handler(BaseHTTPRequestHandler):
         fmt = str(data.get("format", "csv")).lower()
         if fmt not in ("xlsx", "csv"):
             fmt = "csv"
-        if fmt == "xlsx":
-            return _json_response(self, 400, {"error": "En la versión web solo está disponible descarga en CSV. Elige formato CSV."})
 
         try:
             headers, rows = run_search(
@@ -124,7 +126,6 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             return _json_response(self, 502, {"error": str(e)})
 
-        # Solo generar CSV con los resultados reales de la búsqueda (no devolver nada genérico)
         if not rows:
             return _json_response(
                 self,
@@ -133,16 +134,33 @@ class handler(BaseHTTPRequestHandler):
             )
 
         base_name = _sanitize_filename(keyword.replace("'", ""))
-        buf = io.StringIO()
-        writer = csv.writer(buf)
-        writer.writerow(headers)
-        writer.writerows(rows)
-        payload = buf.getvalue().encode("utf-8")
+
+        if fmt == "xlsx":
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.title = "Results"
+            sheet.append(headers)
+            for row in rows:
+                sheet.append(row)
+
+            out = io.BytesIO()
+            workbook.save(out)
+            payload = out.getvalue()
+            content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            filename = f"{base_name}.xlsx"
+        else:
+            csv_buf = io.StringIO()
+            writer = csv.writer(csv_buf)
+            writer.writerow(headers)
+            writer.writerows(rows)
+            payload = csv_buf.getvalue().encode("utf-8")
+            content_type = "text/csv; charset=utf-8"
+            filename = f"{base_name}.csv"
 
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Content-Type", "text/csv; charset=utf-8")
-        self.send_header("Content-Disposition", f'attachment; filename="{base_name}.csv"')
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         self.send_header("Pragma", "no-cache")
         self.send_header("Content-Length", str(len(payload)))
