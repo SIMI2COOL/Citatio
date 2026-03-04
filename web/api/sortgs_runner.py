@@ -37,8 +37,8 @@ def run_search_semantic_scholar(
     session = requests.Session()
     all_results: List[dict] = []
     start = 0
-    # Pedimos como máximo 30 resultados efectivos en la versión web
-    target_results = min(nresults, 30)
+    # Pedimos como máximo 100 resultados efectivos en la versión web
+    target_results = min(nresults, 100)
 
     while len(all_results) < target_results:
         params = {

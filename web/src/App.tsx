@@ -97,7 +97,12 @@ export default function App() {
     }
     setLoading(true);
     setError(null);
-    setDownloadUrl(null);
+    setDownloadUrl((prev) => {
+      if (prev) {
+        URL.revokeObjectURL(prev);
+      }
+      return null;
+    });
     try {
       setSearchedKeyword(keyword);
       const body = {
