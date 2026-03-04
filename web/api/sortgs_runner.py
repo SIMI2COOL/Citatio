@@ -58,6 +58,13 @@ def run_search_semantic_scholar(
             r = session.get(SERPAPI_URL, params=params, timeout=request_timeout)
             r.raise_for_status()
             data = r.json()
+        except requests.Timeout as e:
+            # Si ya tenemos resultados acumulados, devolverlos en lugar de fallar toda la búsqueda
+            if all_results:
+                break
+            raise RuntimeError(
+                "SerpAPI tardó demasiado en responder. Probá de nuevo en unos segundos."
+            ) from e
         except Exception as e:
             raise RuntimeError(f"Error al conectar con SerpAPI: {e}")
 
