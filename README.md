@@ -31,6 +31,9 @@ A modern web interface (Citatio) lets you run searches from the browser and down
 
 The frontend proxies `/api` to the backend; ensure the API is running on port 8000 when using the dev server.
 
+### Deploy en Vercel
+En el proyecto de Vercel, configura **Root Directory** en **`web`**. Así se despliegan frontend y API (Python) juntos; las búsquedas usan la función serverless `web/api/search.py`.
+
 ## 📚 Colab No-Code Instructions
 https://github.com/user-attachments/assets/25de7bad-2a5d-4bcf-b486-faa1d7a29eb3
 
