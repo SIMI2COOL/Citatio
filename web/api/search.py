@@ -121,7 +121,7 @@ class handler(BaseHTTPRequestHandler):
                 langfilter=langfilter_val,
                 debug=False,
                 delay_seconds=0,
-                request_timeout=15,
+                request_timeout=8,
             )
         except Exception as e:
             return _json_response(self, 502, {"error": str(e)})

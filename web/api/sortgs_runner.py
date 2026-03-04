@@ -22,7 +22,7 @@ def run_search_semantic_scholar(
     langfilter: Union[str, list] = "All",
     debug: bool = False,
     delay_seconds: float = 0,
-    request_timeout: float = 25,
+    request_timeout: float = 8,
 ) -> Tuple[List[str], List[List]]:
 
     api_key = os.environ.get("SERPAPI_KEY", "").strip()
@@ -35,10 +35,12 @@ def run_search_semantic_scholar(
         return (HEADERS, [])
 
     session = requests.Session()
-    all_results = []
+    all_results: List[dict] = []
     start = 0
+    # Pedimos como máximo 30 resultados efectivos en la versión web
+    target_results = min(nresults, 30)
 
-    while len(all_results) < nresults:
+    while len(all_results) < target_results:
         params = {
             "engine": "google_scholar",
             "q": query,
@@ -122,7 +124,7 @@ def run_search_semantic_scholar(
     # Ordenar
     sort_idx = 9 if sortby == "cit/year" else 3
     rows.sort(key=lambda r: r[sort_idx], reverse=True)
-    rows = rows[:nresults]
+    rows = rows[:target_results]
     for i, row in enumerate(rows, 1):
         row[0] = i
 
