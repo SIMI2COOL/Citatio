@@ -1,6 +1,5 @@
 import io
 import json
-import os
 import re
 import sys
 from http.server import BaseHTTPRequestHandler
@@ -8,25 +7,15 @@ from pathlib import Path
 
 import pandas as pd
 
+# Same-dir import for Vercel (api/search.py and api/sortgs_runner.py)
+_api_dir = Path(__file__).resolve().parent
+if str(_api_dir) not in sys.path:
+    sys.path.insert(0, str(_api_dir))
+import sortgs_runner  # noqa: E402
+
+run_search = sortgs_runner.run_search
+
 MAX_CSV_FNAME = 255
-
-
-def _get_run_search():
-    """Import run_search so src/ is on path and sortgs is available (Vercel bundles includeFiles: src/**)."""
-    root = Path(__file__).resolve().parent.parent
-    src = root / "src"
-    cwd = Path(os.getcwd())
-    for base in (root, cwd, root.parent):
-        s = base / "src"
-        if (s / "sortgs" / "sortgs.py").exists():
-            if str(s) not in sys.path:
-                sys.path.insert(0, str(s))
-            break
-    else:
-        if str(src) not in sys.path:
-            sys.path.insert(0, str(src))
-    from sortgs.sortgs import run_search  # noqa: E402
-    return run_search
 
 
 def _sanitize_filename(s: str) -> str:
@@ -106,11 +95,6 @@ class handler(BaseHTTPRequestHandler):
             fmt = "xlsx"
 
         try:
-            run_search = _get_run_search()
-        except Exception as e:
-            return _json_response(self, 500, {"error": f"Import failed: {type(e).__name__}: {str(e)}"})
-
-        try:
             df = run_search(
                 keyword=keyword,
                 nresults=nresults,
@@ -119,7 +103,7 @@ class handler(BaseHTTPRequestHandler):
                 end_year=end_year,
                 langfilter=langfilter_val,
                 debug=False,
-                allow_selenium=False,
+                delay_seconds=0,
             )
         except Exception as e:
             return _json_response(self, 502, {"error": f"Search failed: {str(e)}"})
