@@ -1,22 +1,28 @@
 """
-Google Scholar search for Vercel serverless. No pandas — only requests + BeautifulSoup.
+Academic search for Vercel serverless.
+Primary: Semantic Scholar API (reliable, no blocking).
+Fallback/legacy: Google Scholar scrape (requests + BeautifulSoup); often blocked on server.
 Returns (headers, rows) for CSV output.
 """
 import datetime
 import re
-from typing import List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 from urllib.parse import quote_plus
 
 import requests
 from bs4 import BeautifulSoup
 
+# --- Semantic Scholar API (primary, no key required) ---
+SEMANTIC_SCHOLAR_BASE = "https://api.semanticscholar.org/graph/v1/paper/search"
+SEMANTIC_SCHOLAR_FIELDS = "title,year,citationCount,authors,url,abstract,venue,openAccessPdf"
+
+# --- Google Scholar (legacy scrape) ---
 GSCHOLAR_URL = "https://scholar.google.com/scholar?start={}&q={}&hl=en&as_sdt=0,5"
 STARTYEAR_URL = "&as_ylo={}"
 ENDYEAR_URL = "&as_yhi={}"
 LANG_URL = "&lr={}"
 NOW = datetime.datetime.now()
 
-# Keywords that indicate Google blocked the request (CAPTCHA / rate limit).
 ROBOT_BLOCK_KEYWORDS = [
     "unusual traffic from your computer network",
     "not a robot",
@@ -25,7 +31,6 @@ ROBOT_BLOCK_KEYWORDS = [
     "automated requests",
 ]
 
-# Browser-like headers so Google is less likely to return a block page.
 REQUEST_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -69,6 +74,89 @@ def _get_pdf_link(div) -> Optional[str]:
     except Exception:
         pass
     return None
+
+
+def run_search_semantic_scholar(
+    keyword: str,
+    nresults: int = 10,
+    sortby: str = "Citations",
+    start_year: Optional[int] = None,
+    end_year: Optional[int] = None,
+    langfilter: Union[str, list] = "All",
+    debug: bool = False,
+    delay_seconds: float = 0,
+    request_timeout: float = 15,
+) -> Tuple[List[str], List[List]]:
+    """Search via Semantic Scholar API. No scraping, no blocking. Same (headers, rows) format."""
+    if end_year is None:
+        end_year = NOW.year
+
+    query = keyword.strip()
+    if not query:
+        return (HEADERS, [])
+
+    params: Any = {
+        "query": query,
+        "limit": min(100, max(10, nresults)),
+        "offset": 0,
+        "fields": SEMANTIC_SCHOLAR_FIELDS,
+    }
+    if start_year is not None and end_year is not None:
+        params["year"] = f"{start_year}-{end_year}"
+
+    all_data: List[Any] = []
+    while len(all_data) < nresults:
+        params["offset"] = len(all_data)
+        params["limit"] = min(100, nresults - len(all_data))
+        if params["limit"] <= 0:
+            break
+        try:
+            r = requests.get(
+                SEMANTIC_SCHOLAR_BASE,
+                params=params,
+                timeout=request_timeout,
+            )
+            r.raise_for_status()
+            data = r.json()
+        except requests.RequestException as e:
+            raise RuntimeError(f"Semantic Scholar API error: {e}") from e
+        except ValueError as e:
+            raise RuntimeError(f"Invalid response from Semantic Scholar: {e}") from e
+
+        papers = data.get("data") or []
+        if not papers:
+            break
+        all_data.extend(papers)
+        if len(papers) < params["limit"]:
+            break
+        if delay_seconds > 0:
+            import time
+            time.sleep(delay_seconds)
+
+    rows: List[List] = []
+    for i, p in enumerate(all_data):
+        title = (p.get("title") or "No title").strip()
+        year_val = p.get("year")
+        year = int(year_val) if year_val is not None else 0
+        citations = int(p.get("citationCount") or 0)
+        authors_list = p.get("authors") or []
+        author = ", ".join((a.get("name") or "").strip() for a in authors_list) if authors_list else "Unknown"
+        venue = (p.get("venue") or "—").strip()
+        abstract = (p.get("abstract") or "").strip() or "—"
+        url = (p.get("url") or "").strip() or "—"
+        oa = p.get("openAccessPdf")
+        pdf = (oa.get("url") if isinstance(oa, dict) and oa else None) or "No PDF link"
+        if pdf and pdf != "No PDF link":
+            pdf = str(pdf).strip()
+        denom = end_year + 1 - min(year or 0, end_year)
+        cit_per_year = int(round(citations / denom)) if denom > 0 else 0
+        rows.append([i + 1, author, title, citations, year, "—", venue, abstract, url, pdf, cit_per_year])
+
+    sort_idx = 10 if sortby == "cit/year" else 3
+    rows.sort(key=lambda r: (r[sort_idx], r[3]), reverse=True)
+    for i, row in enumerate(rows, 1):
+        row[0] = i
+    return (HEADERS, rows)
 
 
 def run_search(

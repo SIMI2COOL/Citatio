@@ -25,12 +25,12 @@ def _json_response(handler: BaseHTTPRequestHandler, status: int, payload: dict):
 
 
 def _load_runner():
-    """Load sortgs_runner only (requests + bs4). No pandas."""
+    """Load sortgs_runner. Uses Semantic Scholar API (reliable); no scraping."""
     _api_dir = Path(__file__).resolve().parent
     if str(_api_dir) not in sys.path:
         sys.path.insert(0, str(_api_dir))
     import sortgs_runner  # noqa: E402
-    return sortgs_runner.run_search
+    return sortgs_runner.run_search_semantic_scholar
 
 
 class handler(BaseHTTPRequestHandler):
@@ -129,10 +129,7 @@ class handler(BaseHTTPRequestHandler):
             return _json_response(
                 self,
                 502,
-                {
-                    "error": "Google Scholar no devolvió resultados para esta búsqueda. "
-                    "Puede ser bloqueo por uso automático; prueba otra palabra clave, más tarde o desde otra red."
-                },
+                {"error": "No se encontraron resultados para esta búsqueda. Prueba otra palabra clave."},
             )
 
         base_name = _sanitize_filename(keyword.replace("'", ""))
