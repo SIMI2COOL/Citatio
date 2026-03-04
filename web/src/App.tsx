@@ -18,8 +18,8 @@ const LANG_OPTIONS: { code: string; label: string }[] = [
   { code: "tr", label: "Türkçe" },
 ];
 
-const RECENT_SEARCHES_KEY = "citerank_recent_searches_v1";
-const AUTH_STORAGE_KEY = "citerank_auth_v1";
+const RECENT_SEARCHES_KEY = "citarank_recent_searches_v1";
+const AUTH_STORAGE_KEY = "citarank_auth_v1";
 const ACCESS_PASSWORD = "reydelasbusquedas";
 
 export interface SearchParams {
@@ -209,7 +209,7 @@ export default function App() {
             <img src="/logo.svg" alt="" className="h-9 w-9 flex-shrink-0" />
             <div>
               <p className="text-xs uppercase tracking-widest text-neutral-400">Acceso privado</p>
-              <h1 className="text-lg font-semibold">Citerank</h1>
+              <h1 className="text-lg font-semibold">Citarank</h1>
             </div>
           </div>
           <p className="text-sm text-neutral-300 mb-4">
@@ -316,7 +316,7 @@ export default function App() {
               </svg>
             </button>
             <img src="/logo.svg" alt="" className="h-9 w-9 flex-shrink-0" />
-            <span className="font-semibold text-lg">Citerank</span>
+            <span className="font-semibold text-lg">Citarank</span>
           </div>
           <button
             type="button"
