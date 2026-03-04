@@ -76,6 +76,47 @@ def _get_pdf_link(div) -> Optional[str]:
     return None
 
 
+def _semantic_scholar_request(
+    params: Any, request_timeout: float, max_retries: int = 3
+) -> Any:
+    """GET Semantic Scholar with retries on 429 (rate limit)."""
+    import time
+
+    session = requests.Session()
+    session.headers.update({"User-Agent": "AcademicSearch/1.0 (https://github.com/SIMI2COOL/Citatio)"})
+    last_error: Optional[Exception] = None
+    for attempt in range(max_retries):
+        try:
+            r = session.get(
+                SEMANTIC_SCHOLAR_BASE,
+                params=params,
+                timeout=request_timeout,
+            )
+            if r.status_code == 429:
+                wait = (2 ** attempt) * 2  # 2s, 4s, 8s
+                if attempt < max_retries - 1:
+                    time.sleep(wait)
+                    continue
+                raise RuntimeError(
+                    "Demasiadas búsquedas seguidas. Espera un minuto e inténtalo de nuevo."
+                ) from None
+            r.raise_for_status()
+            return r.json()
+        except requests.RequestException as e:
+            last_error = e
+            if hasattr(e, "response") and e.response is not None and e.response.status_code == 429:
+                if attempt < max_retries - 1:
+                    time.sleep((2 ** attempt) * 2)
+                    continue
+                raise RuntimeError(
+                    "Demasiadas búsquedas seguidas. Espera un minuto e inténtalo de nuevo."
+                ) from e
+            raise RuntimeError(f"Semantic Scholar API error: {e}") from e
+    if last_error:
+        raise RuntimeError(f"Semantic Scholar API error: {last_error}") from last_error
+    raise RuntimeError("Semantic Scholar request failed") from None
+
+
 def run_search_semantic_scholar(
     keyword: str,
     nresults: int = 10,
@@ -111,15 +152,9 @@ def run_search_semantic_scholar(
         if params["limit"] <= 0:
             break
         try:
-            r = requests.get(
-                SEMANTIC_SCHOLAR_BASE,
-                params=params,
-                timeout=request_timeout,
-            )
-            r.raise_for_status()
-            data = r.json()
-        except requests.RequestException as e:
-            raise RuntimeError(f"Semantic Scholar API error: {e}") from e
+            data = _semantic_scholar_request(params, request_timeout)
+        except RuntimeError:
+            raise
         except ValueError as e:
             raise RuntimeError(f"Invalid response from Semantic Scholar: {e}") from e
 
