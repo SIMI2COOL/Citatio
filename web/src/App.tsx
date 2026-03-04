@@ -25,6 +25,8 @@ const QUICK_KEYWORDS = [
   "sustainability",
 ];
 
+const RECENT_SEARCHES_KEY = "citerank_recent_searches_v1";
+
 export interface SearchParams {
   keyword: string;
   exact_phrase: boolean;
@@ -53,6 +55,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [searchedKeyword, setSearchedKeyword] = useState<string>("");
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -126,12 +129,39 @@ export default function App() {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       setDownloadUrl(url);
+      setRecentSearches((prev) => {
+        const next = [keyword, ...prev.filter((k) => k !== keyword)];
+        return next.slice(0, 5);
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al generar el informe.");
     } finally {
       setLoading(false);
     }
   }, [params]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(RECENT_SEARCHES_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setRecentSearches(parsed.filter((v): v is string => typeof v === "string"));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recentSearches));
+    } catch {
+      // ignore
+    }
+  }, [recentSearches]);
 
   useEffect(() => {
     return () => {
@@ -202,7 +232,7 @@ export default function App() {
               </svg>
             </button>
             <img src="/logo.svg" alt="" className="h-9 w-9 flex-shrink-0" />
-            <span className="font-semibold text-lg">Citatio</span>
+            <span className="font-semibold text-lg">Citerank</span>
           </div>
           <button
             type="button"
@@ -238,6 +268,26 @@ export default function App() {
             Usa comillas para frase exacta. Varios términos con OR, ej.: &quot;tema A&quot; OR &quot;tema B&quot;
           </p>
 
+          {recentSearches.length > 0 && (
+            <div className="mt-3">
+              <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">
+                Búsquedas recientes
+              </span>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {recentSearches.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => updateParams({ keyword: k })}
+                    className="px-3 py-1.5 rounded-full border border-neutral-300 dark:border-neutral-700 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                  >
+                    {k}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Filters */}
           <div className="mt-6 space-y-4">
             <div className="flex flex-wrap items-center gap-4">
@@ -271,7 +321,7 @@ export default function App() {
                   value={params.start_year === "" ? "" : params.start_year}
                   onChange={(e) =>
                     updateParams({
-                      start_year: e.target.value === "" ? "" : Math.min(2100, Math.max(1900, Number(e.target.value))),
+                      start_year: e.target.value === "" ? "" : Number(e.target.value),
                     })
                   }
                   className="w-24 px-2 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
@@ -287,7 +337,7 @@ export default function App() {
                   value={params.end_year === "" ? "" : params.end_year}
                   onChange={(e) =>
                     updateParams({
-                      end_year: e.target.value === "" ? "" : Math.min(2100, Math.max(1900, Number(e.target.value))),
+                      end_year: e.target.value === "" ? "" : Number(e.target.value),
                     })
                   }
                   className="w-24 px-2 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
@@ -298,16 +348,16 @@ export default function App() {
                 <input
                   type="number"
                   min={10}
-                  max={200}
+                  max={100}
                   value={params.nresults}
                   onChange={(e) =>
                     updateParams({
-                      nresults: Math.min(200, Math.max(10, Number(e.target.value) || 100)),
+                      nresults: Math.min(100, Math.max(10, Number(e.target.value) || 100)),
                     })
                   }
                   className="w-20 px-2 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
                 />
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">(máx. 30 en la versión web)</span>
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">(máx. 100 en la versión web)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-neutral-600 dark:text-neutral-400">Descargar como</span>
