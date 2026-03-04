@@ -58,10 +58,7 @@ export default function App() {
   const [passwordInput, setPasswordInput] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
-  });
+  const [darkMode, setDarkMode] = useState(false);
 
   const updateParams = useCallback((updates: Partial<SearchParams>) => {
     setParams((p) => ({ ...p, ...updates }));

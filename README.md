@@ -10,9 +10,9 @@ sortgs is a Python tool for ranking Google Scholar publications by the number of
 > 💡 **All you need** is a Google Account to get started.  
 > ⚠️ **Note**: Google Scholar may block access after too many repetitive requests due to CAPTCHA checks, so proceed mindfully!
 
-## Citatio – Web app (local)
+## Citarank – Web app (local)
 
-A modern web interface (Citatio) lets you run searches from the browser and download results as Excel or CSV.
+A modern web interface (Citarank) lets you run searches from the browser and download results as Excel or CSV.
 
 1. **From the project root**, install the package and API dependencies:
    ```bash

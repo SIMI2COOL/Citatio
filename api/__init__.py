@@ -1,1 +1,1 @@
-# API package for Citatio / Scholar Export
+# API package for Citarank / Scholar Export

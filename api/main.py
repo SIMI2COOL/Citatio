@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routers import search
 
 app = FastAPI(
-    title="Citatio / Scholar Export API",
+    title="Citarank / Scholar Export API",
     description="Search Google Scholar and export results as Excel or CSV.",
     version="1.0.0",
 )
