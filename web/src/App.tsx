@@ -289,6 +289,7 @@ export default function App() {
                   }
                   className="w-20 px-2 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
                 />
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">(máx. 30 en la versión web)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-neutral-600 dark:text-neutral-400">Descargar como</span>

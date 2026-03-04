@@ -59,6 +59,7 @@ def run_search(
     langfilter: Union[str, list] = "All",
     debug: bool = False,
     delay_seconds: float = 0,
+    request_timeout: float = 15,
 ) -> pd.DataFrame:
     """Run Scholar search; no selenium. delay_seconds=0 for serverless to avoid timeout."""
     from time import sleep
@@ -84,7 +85,7 @@ def run_search(
     for n in range(0, nresults, 10):
         page_url = url.format(str(n), keyword.replace(" ", "+"))
         try:
-            page = session.get(page_url, timeout=15)
+            page = session.get(page_url, timeout=request_timeout)
             c = page.content
         except Exception as e:
             raise RuntimeError(f"Request failed: {e}") from e

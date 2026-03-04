@@ -45,6 +45,7 @@ class handler(BaseHTTPRequestHandler):
             return self._do_post_impl()
         except Exception as e:
             _json_response(self, 500, {"error": f"Server error: {type(e).__name__}: {str(e)}"})
+            return
 
     def _do_post_impl(self):
         try:
@@ -88,7 +89,8 @@ class handler(BaseHTTPRequestHandler):
             nresults = int(nresults)
         except Exception:
             nresults = 100
-        nresults = max(10, min(50, nresults))
+        # Cap at 30 for serverless (3 pages) to stay within Vercel maxDuration
+        nresults = max(10, min(30, nresults))
 
         fmt = str(data.get("format", "xlsx")).lower()
         if fmt not in ("xlsx", "csv"):
@@ -104,6 +106,7 @@ class handler(BaseHTTPRequestHandler):
                 langfilter=langfilter_val,
                 debug=False,
                 delay_seconds=0,
+                request_timeout=8,
             )
         except Exception as e:
             return _json_response(self, 502, {"error": f"Search failed: {str(e)}"})
