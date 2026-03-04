@@ -136,9 +136,12 @@ def run_search_semantic_scholar(
     if not query:
         return (HEADERS, [])
 
+    # Terms for filtering: only keep papers that contain these (avoids irrelevant API results).
+    filter_terms = [w for w in query.strip("'\"").lower().split() if len(w) > 1]
+
     params: Any = {
         "query": query,
-        "limit": min(100, max(10, nresults)),
+        "limit": 100,
         "offset": 0,
         "fields": SEMANTIC_SCHOLAR_FIELDS,
     }
@@ -146,11 +149,10 @@ def run_search_semantic_scholar(
         params["year"] = f"{start_year}-{end_year}"
 
     all_data: List[Any] = []
-    while len(all_data) < nresults:
+    rows_so_far: List[List] = []
+    while True:
         params["offset"] = len(all_data)
-        params["limit"] = min(100, nresults - len(all_data))
-        if params["limit"] <= 0:
-            break
+        params["limit"] = 100
         try:
             data = _semantic_scholar_request(params, request_timeout)
         except RuntimeError:
@@ -162,31 +164,36 @@ def run_search_semantic_scholar(
         if not papers:
             break
         all_data.extend(papers)
-        if len(papers) < params["limit"]:
+        # Build filtered rows to see if we have enough; keep fetching until we do or API has no more.
+        rows_so_far = []
+        for p in all_data:
+            title = (p.get("title") or "No title").strip()
+            abstract = (p.get("abstract") or "").strip() or "—"
+            if filter_terms:
+                text = (title + " " + abstract).lower()
+                if not all(term in text for term in filter_terms):
+                    continue
+            year_val = p.get("year")
+            year = int(year_val) if year_val is not None else 0
+            citations = int(p.get("citationCount") or 0)
+            authors_list = p.get("authors") or []
+            author = ", ".join((a.get("name") or "").strip() for a in authors_list) if authors_list else "Unknown"
+            venue = (p.get("venue") or "—").strip()
+            url = (p.get("url") or "").strip() or "—"
+            oa = p.get("openAccessPdf")
+            pdf = (oa.get("url") if isinstance(oa, dict) and oa else None) or "No PDF link"
+            if pdf and pdf != "No PDF link":
+                pdf = str(pdf).strip()
+            denom = end_year + 1 - min(year or 0, end_year)
+            cit_per_year = int(round(citations / denom)) if denom > 0 else 0
+            rows_so_far.append([len(rows_so_far) + 1, author, title, citations, year, "—", venue, abstract, url, pdf, cit_per_year])
+        if len(rows_so_far) >= nresults or len(papers) < params["limit"]:
             break
         if delay_seconds > 0:
             import time
             time.sleep(delay_seconds)
 
-    rows: List[List] = []
-    for i, p in enumerate(all_data):
-        title = (p.get("title") or "No title").strip()
-        year_val = p.get("year")
-        year = int(year_val) if year_val is not None else 0
-        citations = int(p.get("citationCount") or 0)
-        authors_list = p.get("authors") or []
-        author = ", ".join((a.get("name") or "").strip() for a in authors_list) if authors_list else "Unknown"
-        venue = (p.get("venue") or "—").strip()
-        abstract = (p.get("abstract") or "").strip() or "—"
-        url = (p.get("url") or "").strip() or "—"
-        oa = p.get("openAccessPdf")
-        pdf = (oa.get("url") if isinstance(oa, dict) and oa else None) or "No PDF link"
-        if pdf and pdf != "No PDF link":
-            pdf = str(pdf).strip()
-        denom = end_year + 1 - min(year or 0, end_year)
-        cit_per_year = int(round(citations / denom)) if denom > 0 else 0
-        rows.append([i + 1, author, title, citations, year, "—", venue, abstract, url, pdf, cit_per_year])
-
+    rows = rows_so_far[:nresults]
     sort_idx = 10 if sortby == "cit/year" else 3
     rows.sort(key=lambda r: (r[sort_idx], r[3]), reverse=True)
     for i, row in enumerate(rows, 1):
