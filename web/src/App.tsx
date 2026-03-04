@@ -109,10 +109,12 @@ export default function App() {
         }
         throw new Error(msg);
       }
-      // Solo usar como descarga si la API devolvió CSV (resultado de la búsqueda), no HTML ni otro contenido
-      if (!contentType.includes("text/csv") && !contentType.includes("application/csv")) {
+      // Solo usar como descarga si la API devolvió un archivo esperado (CSV o Excel), no HTML ni otro contenido
+      const isCsv = contentType.includes("text/csv") || contentType.includes("application/csv");
+      const isXlsx = contentType.includes("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      if (!isCsv && !isXlsx) {
         const t = await res.text();
-        let msg = "La respuesta no es un CSV de búsqueda. Comprueba que la API esté activa.";
+        let msg = "La respuesta no es un archivo de búsqueda válido. Comprueba que la API esté activa.";
         try {
           const j = JSON.parse(t) as { error?: string };
           if (typeof j?.error === "string") msg = j.error;
