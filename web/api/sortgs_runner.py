@@ -1,18 +1,16 @@
 """
-Semantic Scholar search — versión simplificada y confiable.
+Google Scholar search via SerpAPI.
 Retorna (headers, rows) para CSV.
 """
 import datetime
+import os
 from typing import List, Optional, Tuple, Union
 
 import requests
 
 NOW = datetime.datetime.now()
-
-HEADERS = ["Rank", "Author", "Title", "Citations", "Year", "Publisher", "Venue", "Content", "Source", "PDF", "cit/year"]
-
-SEMANTIC_SCHOLAR_BASE = "https://api.semanticscholar.org/graph/v1/paper/search"
-SEMANTIC_SCHOLAR_FIELDS = "title,year,citationCount,authors,url,abstract,venue,openAccessPdf"
+HEADERS = ["Rank", "Author", "Title", "Citations", "Year", "Venue", "Abstract", "Source", "PDF", "cit/year"]
+SERPAPI_URL = "https://serpapi.com/search.json"
 
 
 def run_search_semantic_scholar(
@@ -27,79 +25,103 @@ def run_search_semantic_scholar(
     request_timeout: float = 25,
 ) -> Tuple[List[str], List[List]]:
 
+    api_key = os.environ.get("SERPAPI_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("SERPAPI_KEY no configurada. Agregala como variable de entorno en Vercel.")
+
     end_year = end_year or NOW.year
     query = keyword.strip().strip("'\"").strip()
     if not query:
         return (HEADERS, [])
 
     session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Citatio/1.0 (https://github.com/SEMI2COOL/Citatio)"
-    })
+    all_results = []
+    start = 0
 
-    all_papers = []
-    offset = 0
-    batch = 100  # máximo permitido por la API
-
-    while len(all_papers) < 500:  # cap de seguridad
+    while len(all_results) < nresults:
         params = {
-            "query": query,
-            "limit": batch,
-            "offset": offset,
-            "fields": SEMANTIC_SCHOLAR_FIELDS,
+            "engine": "google_scholar",
+            "q": query,
+            "api_key": api_key,
+            "num": 10,
+            "start": start,
+            "hl": "en",
         }
-        if start_year and end_year:
-            params["year"] = f"{start_year}-{end_year}"
-        elif start_year:
-            params["year"] = f"{start_year}-{end_year}"
+        if start_year:
+            params["as_ylo"] = start_year
+        if end_year != NOW.year:
+            params["as_yhi"] = end_year
 
         try:
-            r = session.get(SEMANTIC_SCHOLAR_BASE, params=params, timeout=request_timeout)
-            if r.status_code == 429:
-                raise RuntimeError("Límite de búsquedas alcanzado. Esperá un minuto e intentá de nuevo.")
+            r = session.get(SERPAPI_URL, params=params, timeout=request_timeout)
             r.raise_for_status()
             data = r.json()
-        except RuntimeError:
-            raise
         except Exception as e:
-            raise RuntimeError(f"Error al conectar con Semantic Scholar: {e}")
+            raise RuntimeError(f"Error al conectar con SerpAPI: {e}")
 
-        papers = data.get("data") or []
-        if not papers:
+        if "error" in data:
+            raise RuntimeError(f"SerpAPI error: {data['error']}")
+
+        results = data.get("organic_results") or []
+        if not results:
             break
 
-        all_papers.extend(papers)
-        offset += len(papers)
+        all_results.extend(results)
+        start += len(results)
 
-        # Si ya tenemos suficientes o la API no tiene más, parar
-        if len(papers) < batch:
-            break
-        if len(all_papers) >= nresults * 3:  # buscar 3x para tener margen al ordenar
+        # SerpAPI devuelve de a 10; si devolvió menos de 10 no hay más páginas
+        if len(results) < 10:
             break
 
-    # Construir filas sin filtrar — Semantic Scholar ya es relevante por query
     rows = []
-    for p in all_papers:
-        title = (p.get("title") or "").strip() or "No title"
-        abstract = (p.get("abstract") or "").strip() or "—"
-        year_val = p.get("year")
-        year = int(year_val) if year_val else 0
-        citations = int(p.get("citationCount") or 0)
-        authors_list = p.get("authors") or []
-        author = ", ".join((a.get("name") or "").strip() for a in authors_list) if authors_list else "Unknown"
-        venue = (p.get("venue") or "—").strip()
-        url = (p.get("url") or "—").strip()
-        oa = p.get("openAccessPdf")
-        pdf = (oa.get("url") if isinstance(oa, dict) and oa else None) or "No PDF link"
+    for p in all_results:
+        title = (p.get("title") or "No title").strip()
+
+        # Citas
+        inline = p.get("inline_links") or {}
+        cited_by = inline.get("cited_by") or {}
+        citations = int(cited_by.get("total") or 0)
+
+        # Año
+        pub_info = p.get("publication_info") or {}
+        summary = pub_info.get("summary") or ""
+        year = 0
+        import re
+        m = re.search(r"\b(19|20)\d{2}\b", summary)
+        if m:
+            year = int(m.group(0))
+
+        # Autores
+        authors_list = pub_info.get("authors") or []
+        if authors_list:
+            author = ", ".join(a.get("name", "") for a in authors_list)
+        else:
+            # fallback: primer fragmento antes del primer " - " en summary
+            author = summary.split(" - ")[0].strip() if summary else "Unknown"
+
+        # Venue
+        parts = summary.split(" - ")
+        venue = parts[1].strip() if len(parts) >= 2 else "—"
+
+        # Abstract
+        abstract = (p.get("snippet") or "—").strip()
+
+        # Links
+        url = (p.get("link") or "—").strip()
+        resources = p.get("resources") or []
+        pdf = next(
+            (r["link"] for r in resources if isinstance(r, dict) and "pdf" in (r.get("file_format") or "").lower()),
+            "No PDF link"
+        )
+
         denom = max(1, end_year + 1 - min(year or end_year, end_year))
         cit_per_year = round(citations / denom, 1) if year else 0
-        rows.append([0, author, title, citations, year, "—", venue, abstract, url, pdf, cit_per_year])
 
-    # Ordenar por lo pedido
-    sort_idx = 10 if sortby == "cit/year" else 3
+        rows.append([0, author, title, citations, year, venue, abstract, url, pdf, cit_per_year])
+
+    # Ordenar
+    sort_idx = 9 if sortby == "cit/year" else 3
     rows.sort(key=lambda r: r[sort_idx], reverse=True)
-
-    # Tomar solo los N pedidos y asignar rank
     rows = rows[:nresults]
     for i, row in enumerate(rows, 1):
         row[0] = i
