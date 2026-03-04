@@ -52,6 +52,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [searchedKeyword, setSearchedKeyword] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -62,6 +63,7 @@ export default function App() {
     setParams((p) => ({ ...p, ...updates }));
     setError(null);
     setDownloadUrl(null);
+    setSearchedKeyword("");
   }, []);
 
   const applySuggestion = useCallback((keyword: string) => {
@@ -79,6 +81,7 @@ export default function App() {
     setError(null);
     setDownloadUrl(null);
     try {
+      setSearchedKeyword(keyword);
       const body = {
         keyword,
         exact_phrase: params.exact_phrase,
@@ -380,7 +383,7 @@ export default function App() {
                 <p className="text-green-800 dark:text-green-200 font-medium mb-2">Informe listo</p>
                 <a
                   href={downloadUrl}
-                  download={`${params.keyword.trim().replace(/[\s:]+/g, "_").slice(0, 80) || "scholar_export"}.${params.format}`}
+                  download={`${searchedKeyword.replace(/[\s:]+/g, "_").slice(0, 80) || "scholar_export"}.${params.format}`}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 font-medium"
                 >
                   Descargar {params.format === "xlsx" ? "Excel" : "CSV"}
