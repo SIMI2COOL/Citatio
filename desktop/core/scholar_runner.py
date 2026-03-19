@@ -1,14 +1,18 @@
 """
 Google Scholar search by scraping HTML.
 
-Returns `(headers, rows)` with a stable column order expected by `web/api/search.py`
-and the React frontend:
+This is a desktop-friendly copy of the existing `web/api/sortgs_runner.py` runner,
+so the PC app can package cleanly without the old web folder.
+
+Returns `(headers, rows)` with stable column order:
 ["Rank", "Author", "Title", "Citations", "Year", "Venue", "Abstract", "Source", "PDF", "cit/year"]
 """
 
+from __future__ import annotations
+
 import datetime
-import re
 import random
+import re
 import time
 from typing import List, Optional, Tuple, Union
 
@@ -84,8 +88,8 @@ def run_search_semantic_scholar(
     """
     Scrape Google Scholar results pages.
 
-    Note: Vercel serverless may be blocked by Google Scholar (CAPTCHA). We raise a
-    friendly error so the UI can show what happened.
+    Google Scholar can block automated requests (CAPTCHA / 429). We raise a friendly
+    error so the UI can show what happened.
     """
     end_year = end_year or NOW.year
     query = keyword.strip().strip("'\"").strip()
@@ -100,41 +104,40 @@ def run_search_semantic_scholar(
     if langfilter != "All" and isinstance(langfilter, list) and langfilter:
         main_url = main_url + LANG_URL.format(_format_lang([str(x) for x in langfilter]))
     if debug:
-        # Useful for unit testing without hitting Scholar repeatedly.
         main_url = "https://web.archive.org/web/20210314203256/" + main_url
 
     session = requests.Session()
-    # Help reduce immediate "bot" blocks by sending a realistic browser identity.
     session.headers.update(
         {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9",
         }
     )
+
     headers: List[str] = HEADERS
     rows: List[List] = []
 
-    # Scholar paginates in blocks of 10 results.
     target_results = max(10, nresults)
-    max_page_retries = 2  # total attempts = max_page_retries + 1
+    max_page_retries = 2
     backoff_base_seconds = 2.0
+
     for n in range(0, target_results, 10):
         page_url = main_url.format(str(n), query.replace(" ", "+"))
         last_exc: Exception | None = None
         html: str | None = None
+
         for attempt in range(max_page_retries + 1):
             try:
                 resp = session.get(page_url, timeout=request_timeout)
 
-                # 429 = rate-limited. Retry a couple times with backoff, then fail with guidance.
                 if resp.status_code == 429:
                     if attempt < max_page_retries:
                         sleep_s = backoff_base_seconds * (2**attempt) + random.uniform(0, 0.5)
                         time.sleep(sleep_s)
                         continue
                     raise RuntimeError(
-                        "Google Scholar bloqueó el acceso (429 Too Many Requests). "
-                        "Espera unos minutos e intenta de nuevo usando menos resultados (máx. 15)."
+                        "Google Scholar blocked the request (too many requests). "
+                        "Wait a few minutes and try again with fewer results (max 15)."
                     )
 
                 resp.raise_for_status()
@@ -142,7 +145,6 @@ def run_search_semantic_scholar(
                 last_exc = None
                 break
             except RuntimeError as e:
-                # Friendly, already user-facing.
                 raise e
             except requests.Timeout as e:
                 last_exc = e
@@ -156,13 +158,13 @@ def run_search_semantic_scholar(
                     continue
 
         if html is None:
-            raise RuntimeError(f"Error al solicitar Google Scholar: {last_exc}") from last_exc
+            raise RuntimeError(f"Network error while requesting Google Scholar: {last_exc}") from last_exc
 
         lowered = html.lower()
         if any(kw in lowered for kw in ROBOT_KW):
             raise RuntimeError(
-                "Google Scholar bloqueó el acceso (CAPTCHA/robot check). "
-                "Espera un momento y vuelve a intentar, o prueba con menos búsquedas."
+                "Google Scholar blocked the request (robot/CAPTCHA check). "
+                "Wait a moment and try again, or try fewer results."
             )
 
         soup = BeautifulSoup(html, "html.parser")
@@ -183,7 +185,6 @@ def run_search_semantic_scholar(
             year = _get_year(gs_a_text)
             author = _get_author(gs_a_text) or "Unknown"
 
-            # Venue: in Scholar this comes from the "Author - Venue, Year" text line.
             parts = gs_a_text.split(" - ")
             venue = parts[1].strip() if len(parts) >= 2 else "—"
 
@@ -196,17 +197,14 @@ def run_search_semantic_scholar(
             cit_per_year = int(round(citations / denom, 0)) if year else 0
 
             rows.append([0, author, title, citations, year, venue, abstract, source, pdf_link, cit_per_year])
-
             if len(rows) >= target_results:
                 break
 
         if delay_seconds > 0:
             time.sleep(delay_seconds)
-
         if len(rows) >= target_results:
             break
 
-    # Sort rows by selected column.
     try:
         sort_idx = 9 if sortby == "cit/year" else 3
         rows.sort(key=lambda r: r[sort_idx], reverse=True)
