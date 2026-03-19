@@ -181,7 +181,8 @@ def _maybe_create_desktop_shortcut() -> None:
             desktop_dir.mkdir(parents=True, exist_ok=True)
             app_path = desktop_dir / f"{APP_NAME}.app"
             root_dir = Path(__file__).resolve().parent.parent
-            root_icon = root_dir / "icon.icns"
+            # macOS icon file (repo: desktop/icon.icns)
+            root_icon = Path(__file__).resolve().parent / "icon.icns"
 
             # If the launcher app already exists, make a best-effort to add the icon
             # without overwriting the whole bundle.
