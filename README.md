@@ -17,7 +17,7 @@ git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
 cd Citatio/desktop
 py -m pip install -r requirements.txt
-py main.py
+py Citatio.py
 ```
 
 ## macOS (Terminal)
@@ -27,7 +27,7 @@ git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
 cd Citatio/desktop
 python3 -m pip install -r requirements.txt
-python3 main.py
+python3 Citatio.py
 ```
 
 ## Linux (Terminal)
@@ -37,7 +37,7 @@ git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
 cd Citatio/desktop
 python3 -m pip install -r requirements.txt
-python3 main.py
+python3 Citatio.py
 ```
 
 ## Build a Windows EXE (optional)

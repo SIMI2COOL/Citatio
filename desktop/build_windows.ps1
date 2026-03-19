@@ -20,7 +20,7 @@ py -m PyInstaller `
   --onefile `
   --windowed `
   $iconArg `
-  .\main.py
+  .\Citatio.py
 
 Write-Host ""
 Write-Host "Built: $PSScriptRoot\dist\Citatio.exe"
