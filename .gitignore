@@ -15,3 +15,8 @@ desktop/*.spec
 node_modules/
 dist/
 
+# Keep the packaged Windows app in git.
+!desktop/dist/
+desktop/dist/*
+!desktop/dist/Citatio.exe
+
