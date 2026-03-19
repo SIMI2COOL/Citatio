@@ -233,6 +233,45 @@ class RainbowHeader(QWidget):
             p.fillRect(0, y, self.width(), self.height() - y, QColor(colors[-1]))
 
 
+class BevelFrame(QWidget):
+    """
+    Transparent outer frame that draws the window bevel on top.
+    Drawing here (instead of MainWindow paintEvent) avoids the central widgets
+    repainting over the border.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setAutoFillBackground(False)
+        # Override the global QWidget background from theme.qss().
+        self.setStyleSheet("background: transparent;")
+
+    def paintEvent(self, event):  # noqa: N802
+        p = QPainter(self)
+        r = self.rect()
+        thickness = 3
+
+        # i=0: bright highlight top/left
+        p.setPen(QColor(PAL.bevel_highlight))
+        i = 0
+        p.drawLine(r.left() + i, r.top() + i, r.right() - i, r.top() + i)
+        p.drawLine(r.left() + i, r.top() + i, r.left() + i, r.bottom() - i)
+
+        # i=1: mid gray inner edge (both sides)
+        p.setPen(QColor(PAL.bevel_inner))
+        i = 1
+        p.drawLine(r.left() + i, r.top() + i, r.right() - i, r.top() + i)
+        p.drawLine(r.left() + i, r.top() + i, r.left() + i, r.bottom() - i)
+        p.drawLine(r.left() + i, r.bottom() - i, r.right() - i, r.bottom() - i)
+        p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
+
+        # i=2: dark shadow bottom/right
+        p.setPen(QColor(PAL.bevel_shadow))
+        i = 2
+        p.drawLine(r.left() + i, r.bottom() - i, r.right() - i, r.bottom() - i)
+        p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
+
+
 class PlatinumTitleBar(QWidget):
     close_clicked = Signal()
     minimize_clicked = Signal()
@@ -343,7 +382,7 @@ class MainWindow(QMainWindow):
         # Wider hit area so resizing feels dynamic even while dragging quickly.
         self._resize_edge = 7
 
-        outer = QWidget()
+        outer = BevelFrame(self)
         self.outer_layout = QVBoxLayout(outer)
         self.outer_layout.setContentsMargins(
             self._frame_margin,
@@ -650,32 +689,8 @@ class MainWindow(QMainWindow):
         self.addAction(act)
 
     def paintEvent(self, event):  # noqa: N802
+        # Bevel border is drawn by the central `BevelFrame` widget.
         super().paintEvent(event)
-
-        # Old Mac OS-style 3px double-bevel border.
-        p = QPainter(self)
-        r = self.rect()
-        thickness = 3
-
-        # i=0: bright highlight top/left
-        p.setPen(QColor(PAL.bevel_highlight))
-        i = 0
-        p.drawLine(r.left() + i, r.top() + i, r.right() - i, r.top() + i)
-        p.drawLine(r.left() + i, r.top() + i, r.left() + i, r.bottom() - i)
-
-        # i=1: mid gray inner edge (both sides)
-        p.setPen(QColor(PAL.bevel_inner))
-        i = 1
-        p.drawLine(r.left() + i, r.top() + i, r.right() - i, r.top() + i)
-        p.drawLine(r.left() + i, r.top() + i, r.left() + i, r.bottom() - i)
-        p.drawLine(r.left() + i, r.bottom() - i, r.right() - i, r.bottom() - i)
-        p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
-
-        # i=2: dark shadow bottom/right
-        p.setPen(QColor(PAL.bevel_shadow))
-        i = 2
-        p.drawLine(r.left() + i, r.bottom() - i, r.right() - i, r.bottom() - i)
-        p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
 
     def _refresh_save_path(self) -> None:
         keyword = (self.keyword.text() or "").strip()
