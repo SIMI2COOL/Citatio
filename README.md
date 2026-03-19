@@ -1,4 +1,4 @@
-# Que-Dice Google Scholar — Desktop App
+# Citatio
 
 Desktop-only app to search Google Scholar and export results.
 
