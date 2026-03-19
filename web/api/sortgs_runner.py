@@ -8,6 +8,7 @@ and the React frontend:
 
 import datetime
 import re
+import random
 import time
 from typing import List, Optional, Tuple, Union
 
@@ -103,19 +104,59 @@ def run_search_semantic_scholar(
         main_url = "https://web.archive.org/web/20210314203256/" + main_url
 
     session = requests.Session()
+    # Help reduce immediate "bot" blocks by sending a realistic browser identity.
+    session.headers.update(
+        {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+    )
     headers: List[str] = HEADERS
     rows: List[List] = []
 
     # Scholar paginates in blocks of 10 results.
     target_results = max(10, nresults)
+    max_page_retries = 2  # total attempts = max_page_retries + 1
+    backoff_base_seconds = 2.0
     for n in range(0, target_results, 10):
         page_url = main_url.format(str(n), query.replace(" ", "+"))
-        try:
-            resp = session.get(page_url, timeout=request_timeout)
-            resp.raise_for_status()
-            html = resp.text
-        except Exception as e:
-            raise RuntimeError(f"Error al solicitar Google Scholar: {e}") from e
+        last_exc: Exception | None = None
+        html: str | None = None
+        for attempt in range(max_page_retries + 1):
+            try:
+                resp = session.get(page_url, timeout=request_timeout)
+
+                # 429 = rate-limited. Retry a couple times with backoff, then fail with guidance.
+                if resp.status_code == 429:
+                    if attempt < max_page_retries:
+                        sleep_s = backoff_base_seconds * (2**attempt) + random.uniform(0, 0.5)
+                        time.sleep(sleep_s)
+                        continue
+                    raise RuntimeError(
+                        "Google Scholar bloqueó el acceso (429 Too Many Requests). "
+                        "Espera unos minutos e intenta de nuevo usando menos resultados (máx. 15)."
+                    )
+
+                resp.raise_for_status()
+                html = resp.text
+                last_exc = None
+                break
+            except RuntimeError as e:
+                # Friendly, already user-facing.
+                raise e
+            except requests.Timeout as e:
+                last_exc = e
+                if attempt < max_page_retries:
+                    time.sleep(backoff_base_seconds * (2**attempt))
+                    continue
+            except requests.RequestException as e:
+                last_exc = e
+                if attempt < max_page_retries:
+                    time.sleep(backoff_base_seconds * (2**attempt))
+                    continue
+
+        if html is None:
+            raise RuntimeError(f"Error al solicitar Google Scholar: {last_exc}") from last_exc
 
         lowered = html.lower()
         if any(kw in lowered for kw in ROBOT_KW):

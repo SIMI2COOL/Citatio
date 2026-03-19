@@ -104,15 +104,15 @@ export const SearchForm: FC<Props> = ({ params, loading, onUpdateParams, onRun }
             <input
               type="number"
               min={10}
-              max={30}
+              max={15}
               value={params.nresults}
               onChange={(e) => {
-                const n = Number(e.target.value) || 30;
-                onUpdateParams({ nresults: Math.min(30, Math.max(10, n)) });
+                const n = Number(e.target.value) || 15;
+                onUpdateParams({ nresults: Math.min(15, Math.max(10, n)) });
               }}
               className="w-20 px-2 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm"
             />
-            <span className="text-xs text-neutral-500 dark:text-neutral-400">(máx. 30)</span>
+            <span className="text-xs text-neutral-500 dark:text-neutral-400">(máx. 15)</span>
           </div>
 
           <div className="flex items-center gap-2">

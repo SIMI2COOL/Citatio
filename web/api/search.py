@@ -110,8 +110,8 @@ class handler(BaseHTTPRequestHandler):
         except Exception:
             nresults = 100
         # Vercel stability: scraping Google Scholar directly can be slow / blocked.
-        # Keep this conservative.
-        nresults = max(10, min(30, nresults))
+        # Keep this conservative to reduce the chance of HTTP 429.
+        nresults = max(10, min(15, nresults))
 
         fmt = str(data.get("format", "csv")).lower()
         if fmt not in ("xlsx", "csv"):
@@ -126,7 +126,7 @@ class handler(BaseHTTPRequestHandler):
                 end_year=end_year,
                 langfilter=langfilter_val,
                 debug=False,
-                delay_seconds=0,
+                delay_seconds=1.0,
                 request_timeout=8,
             )
         except Exception as e:

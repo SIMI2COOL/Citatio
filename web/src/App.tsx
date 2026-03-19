@@ -17,7 +17,7 @@ const defaultParams: SearchParams = {
   start_year: "",
   end_year: "",
   langfilter: [],
-  nresults: 30,
+  nresults: 15,
   format: "csv",
 };
 
