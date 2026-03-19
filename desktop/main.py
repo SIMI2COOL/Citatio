@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import csv
+import datetime
+import re
 import sys
 import traceback
-import datetime
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt, QThread, Signal
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt, QThread, QTimer, Signal
+from PySide6.QtGui import QAction, QColor, QKeySequence, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
-    QFileDialog,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -35,6 +35,15 @@ from theme import PAL, qss
 APP_NAME = "CiteRank (Desktop)"
 
 
+def _sanitize_filename(s: str) -> str:
+    s = (s or "").strip()
+    s = s.replace("\xa0", " ")
+    s = re.sub(r"[\\/:*?\"<>|]+", "_", s)  # Windows-illegal chars
+    s = re.sub(r"\s+", " ", s).strip()
+    s = s[:120].strip(" ._")
+    return s or "scholar_results"
+
+
 def _load_runner():
     from core.scholar_runner import run_search_semantic_scholar
 
@@ -50,6 +59,7 @@ class SearchParams:
     start_year: Optional[int]
     end_year: Optional[int]
     langfilter: str
+    extra_delay: bool
     out_format: str  # csv|xlsx
     out_path: Path
 
@@ -114,8 +124,8 @@ class SearchWorker(QObject):
             keyword = self.params.keyword.strip()
             phrase = keyword.strip().strip("'\"") if self.params.exact_phrase else None
 
-            # Keep conservative by default to reduce Scholar blocks.
-            nresults = max(10, min(15, int(self.params.nresults)))
+            # Allow larger pulls, but cap to reduce bans.
+            nresults = max(10, min(100, int(self.params.nresults)))
 
             self.progress.emit(15)
             headers, rows = run_search(
@@ -126,7 +136,7 @@ class SearchWorker(QObject):
                 end_year=self.params.end_year,
                 langfilter="All" if self.params.langfilter == "All" else [self.params.langfilter],
                 debug=False,
-                delay_seconds=1.0,
+                delay_seconds=2.5 if self.params.extra_delay else 1.0,
                 request_timeout=10,
             )
 
@@ -170,15 +180,35 @@ class RainbowHeader(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.setFixedHeight(18)
+        self._tick = 0
+        self._timer = QTimer(self)
+        self._timer.setInterval(120)  # 8-bit-ish pacing
+        self._timer.timeout.connect(self._advance)
+        self._timer.start()
+
+    def _advance(self) -> None:
+        self._tick = (self._tick + 1) % 10_000
+        self.update()
 
     def paintEvent(self, event):  # noqa: N802
         colors = [PAL.green, PAL.yellow, PAL.orange, PAL.red, PAL.purple, PAL.blue]
         stripe_h = max(1, self.height() // len(colors))
         p = QPainter(self)
+
+        # Pixel shimmer: animated 4px "blocks" drifting across.
+        block = 4
+        drift = (self._tick * 2) % (block * len(colors))
         y = 0
-        for c in colors:
+        for i, c in enumerate(colors):
             p.fillRect(0, y, self.width(), stripe_h, QColor(c))
+            # Add 8-bit dither highlights (subtle, never as base surface)
+            accent = QColor(colors[(i + (self._tick // 2)) % len(colors)])
+            accent.setAlpha(60)
+            for x in range(-drift, self.width() + block, block):
+                if ((x // block) + i + (self._tick // 2)) % 7 == 0:
+                    p.fillRect(x, y, block, stripe_h, accent)
             y += stripe_h
+
         if y < self.height():
             p.fillRect(0, y, self.width(), self.height() - y, QColor(colors[-1]))
 
@@ -275,13 +305,18 @@ class MainWindow(QMainWindow):
         self.keyword = QLineEdit()
         self.keyword.setPlaceholderText("e.g. diffusion models medical imaging")
         self.exact = QCheckBox("Exact phrase (filters by title)")
+        self.keyword.textChanged.connect(self._refresh_save_path)
 
         self.sortby = QComboBox()
         self.sortby.addItems(["Citations", "cit/year"])
 
         self.nresults = QSpinBox()
-        self.nresults.setRange(10, 15)
-        self.nresults.setValue(15)
+        self.nresults.setRange(10, 100)
+        self.nresults.setSingleStep(5)
+        self.nresults.setValue(25)
+
+        self.extra_delay = QCheckBox("Extra delay (safer)")
+        self.extra_delay.setChecked(True)
 
         this_year = datetime.datetime.now().year
         self.start_year = QSpinBox()
@@ -295,15 +330,81 @@ class MainWindow(QMainWindow):
         self.end_year.setValue(0)
 
         self.lang = QComboBox()
-        self.lang.addItems(["All", "en", "es", "fr", "de", "pt", "it"])
+        self._lang_map = {
+            "All languages": "All",
+            "English": "en",
+            "Español": "es",
+            "Polski": "pl",
+            "Français": "fr",
+            "Deutsch": "de",
+            "Português": "pt",
+            "Italiano": "it",
+            "Nederlands": "nl",
+            "Svenska": "sv",
+            "Norsk": "no",
+            "Dansk": "da",
+            "Suomi": "fi",
+            "Čeština": "cs",
+            "Slovenčina": "sk",
+            "Magyar": "hu",
+            "Română": "ro",
+            "Türkçe": "tr",
+            "Ελληνικά": "el",
+            "Русский": "ru",
+            "Українська": "uk",
+            "العربية": "ar",
+            "हिन्दी": "hi",
+            "ไทย": "th",
+            "Tiếng Việt": "vi",
+            "Bahasa Indonesia": "id",
+            "日本語": "ja",
+            "한국어": "ko",
+            "中文（简体）": "zh-CN",
+            "中文（繁體）": "zh-TW",
+        }
+        # Order matters; place Polish directly below Español as requested.
+        ordered = [
+            "All languages",
+            "English",
+            "Español",
+            "Polski",
+            "Français",
+            "Deutsch",
+            "Português",
+            "Italiano",
+            "Nederlands",
+            "Svenska",
+            "Norsk",
+            "Dansk",
+            "Suomi",
+            "Čeština",
+            "Slovenčina",
+            "Magyar",
+            "Română",
+            "Türkçe",
+            "Ελληνικά",
+            "Русский",
+            "Українська",
+            "العربية",
+            "हिन्दी",
+            "ไทย",
+            "Tiếng Việt",
+            "Bahasa Indonesia",
+            "日本語",
+            "한국어",
+            "中文（简体）",
+            "中文（繁體）",
+        ]
+        self.lang.addItems(ordered)
 
         self.format = QComboBox()
         self.format.addItems(["csv", "xlsx"])
+        self.format.currentTextChanged.connect(self._refresh_save_path)
 
         self.save_to = QLineEdit()
         self.save_to.setReadOnly(True)
-        self.browse = QPushButton("Choose file…")
-        self.browse.clicked.connect(self._choose_file)
+        self.save_hint = QLabel("(Auto-saved to your Downloads folder)")
+        self.save_hint.setStyleSheet(f"color: {PAL.edge};")
 
         row = 0
         grid.addWidget(QLabel("Keyword"), row, 0)
@@ -315,8 +416,11 @@ class MainWindow(QMainWindow):
 
         grid.addWidget(QLabel("Sort by"), row, 0)
         grid.addWidget(self.sortby, row, 1)
-        grid.addWidget(QLabel("Results (max 15)"), row, 2)
+        grid.addWidget(QLabel("Results (max 100)"), row, 2)
         grid.addWidget(self.nresults, row, 3)
+        row += 1
+
+        grid.addWidget(self.extra_delay, row, 1, 1, 3)
         row += 1
 
         grid.addWidget(QLabel("Year from"), row, 0)
@@ -333,7 +437,7 @@ class MainWindow(QMainWindow):
 
         grid.addWidget(QLabel("Save as"), row, 0)
         grid.addWidget(self.save_to, row, 1, 1, 2)
-        grid.addWidget(self.browse, row, 3)
+        grid.addWidget(self.save_hint, row, 3)
 
         root.addWidget(form)
 
@@ -344,8 +448,16 @@ class MainWindow(QMainWindow):
         self.open_btn.clicked.connect(self._open_folder)
         self.open_btn.setEnabled(False)
 
+        self.fullscreen_btn = QPushButton("Full screen")
+        self.fullscreen_btn.clicked.connect(self._toggle_fullscreen)
+
+        self.help_btn = QPushButton("Search tips")
+        self.help_btn.clicked.connect(self._show_search_tips)
+
         buttons.addWidget(self.run_btn)
         buttons.addWidget(self.open_btn)
+        buttons.addWidget(self.fullscreen_btn)
+        buttons.addWidget(self.help_btn)
         buttons.addStretch(1)
 
         self.status = QLabel("Ready.")
@@ -366,7 +478,14 @@ class MainWindow(QMainWindow):
         root.addWidget(self.table, 1)
 
         self._last_saved: Optional[Path] = None
-        self._choose_default_file()
+        self._install_shortcuts()
+        self._refresh_save_path()
+
+    def _install_shortcuts(self) -> None:
+        act = QAction(self)
+        act.setShortcut(QKeySequence(Qt.Key_F11))
+        act.triggered.connect(self._toggle_fullscreen)
+        self.addAction(act)
 
     def paintEvent(self, event):  # noqa: N802
         # Chunky 3px beveled border: light top-left, dark bottom-right.
@@ -381,19 +500,36 @@ class MainWindow(QMainWindow):
             p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
         super().paintEvent(event)
 
-    def _choose_default_file(self) -> None:
-        base = "scholar_results"
+    def _refresh_save_path(self) -> None:
+        keyword = (self.keyword.text() or "").strip()
         ext = self.format.currentText()
+        base = _sanitize_filename(keyword) if keyword else "scholar_results"
         out = Path.home() / "Downloads" / f"{base}.{ext}"
         self.save_to.setText(str(out))
 
-    def _choose_file(self) -> None:
-        ext = self.format.currentText()
-        suggested = self.save_to.text().strip() or str(Path.home() / "Downloads" / f"scholar_results.{ext}")
-        filt = "CSV (*.csv)" if ext == "csv" else "Excel (*.xlsx)"
-        path, _ = QFileDialog.getSaveFileName(self, "Save results as…", suggested, filt)
-        if path:
-            self.save_to.setText(path)
+    def _toggle_fullscreen(self) -> None:
+        if self.isFullScreen():
+            self.showNormal()
+            self.fullscreen_btn.setText("Full screen")
+        else:
+            self.showFullScreen()
+            self.fullscreen_btn.setText("Exit full screen")
+
+    def _show_search_tips(self) -> None:
+        QMessageBox.information(
+            self,
+            "Search tips",
+            "You can use Google-style operators in your keyword:\n\n"
+            "- Exact phrase: put it in quotes, like: \"diffusion models\"\n"
+            "- AND: just type both words (Scholar treats it like AND)\n"
+            "- OR: use OR in caps, like: (diffusion OR denoising)\n"
+            "- Exclude words: use a minus, like: diffusion -survey\n"
+            "- Grouping: use parentheses, like: (diffusion OR denoising) medical\n\n"
+            "Tips to avoid blocks:\n"
+            "- Turn on “Extra delay (safer)”\n"
+            "- Ask for fewer results (25–50)\n"
+            "- If blocked, wait a few minutes and try again",
+        )
 
     def _open_folder(self) -> None:
         if not self._last_saved:
@@ -427,7 +563,8 @@ class MainWindow(QMainWindow):
             nresults=int(self.nresults.value()),
             start_year=start_year,
             end_year=end_year,
-            langfilter=self.lang.currentText(),
+            langfilter=self._lang_map.get(self.lang.currentText(), "All"),
+            extra_delay=self.extra_delay.isChecked(),
             out_format=self.format.currentText(),
             out_path=out_path,
         )
