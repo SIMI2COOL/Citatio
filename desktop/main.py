@@ -55,7 +55,6 @@ def _load_runner():
 @dataclass(frozen=True)
 class SearchParams:
     keyword: str
-    exact_phrase: bool
     sortby: str
     nresults: int
     start_year: Optional[int]
@@ -137,7 +136,13 @@ class SearchWorker(QObject):
             run_search = _load_runner()
 
             keyword = self.params.keyword.strip()
-            phrase = keyword.strip().strip("'\"") if self.params.exact_phrase else None
+            # If the user wraps the keyword in quotes, treat it as an exact title match.
+            # Examples: `"UE-Mercosur"` or `'UE-Mercosur'`
+            phrase: str | None = None
+            if len(keyword) >= 2:
+                if (keyword[0] == '"' and keyword[-1] == '"') or (keyword[0] == "'" and keyword[-1] == "'"):
+                    inner = keyword[1:-1].strip()
+                    phrase = inner if inner else None
 
             # Allow larger pulls, but cap to reduce bans.
             nresults = max(10, min(100, int(self.params.nresults)))
@@ -332,30 +337,34 @@ class MainWindow(QMainWindow):
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
 
+        # Frameless window frame (Mac OS-style bevel).
+        self._frame_margin = 6
+        # Wider hit area so resizing feels dynamic even while dragging quickly.
+        self._resize_edge = 7
+
         outer = QWidget()
-        outer_layout = QVBoxLayout(outer)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
-        outer_layout.setSpacing(0)
+        self.outer_layout = QVBoxLayout(outer)
+        self.outer_layout.setContentsMargins(
+            self._frame_margin,
+            self._frame_margin,
+            self._frame_margin,
+            self._frame_margin,
+        )
+        self.outer_layout.setSpacing(0)
 
         self.titlebar = PlatinumTitleBar(outer)
         self.titlebar.close_clicked.connect(self.close)
         self.titlebar.minimize_clicked.connect(self.showMinimized)
         self.titlebar.zoom_clicked.connect(self._toggle_maximize)
-        outer_layout.addWidget(self.titlebar)
-        outer_layout.addWidget(RainbowHeader())
+        self.outer_layout.addWidget(self.titlebar)
+        self.outer_layout.addWidget(RainbowHeader())
 
         content = QWidget()
-        outer_layout.addWidget(content, 1)
+        self.outer_layout.addWidget(content, 1)
 
         self.setCentralWidget(outer)
-
-        self._resizing = False
-        self._resize_edges = 0
-        self._resize_start_pos = None
-        self._resize_start_geom = None
-
-        # Edge-resize for frameless windows: native resizing doesn't work reliably.
-        QApplication.instance().installEventFilter(self)
+        # Needed so we can update the cursor when hovering edges.
+        self.setMouseTracking(True)
 
         root = QVBoxLayout(content)
         root.setContentsMargins(12, 12, 12, 12)
@@ -372,34 +381,7 @@ class MainWindow(QMainWindow):
         grid.setColumnStretch(3, 1)
 
         self.keyword = QLineEdit()
-        self.keyword.setPlaceholderText("e.g. \"UE-Mercosur\" OR \"Transformer Models\"")
-
-        self.exact_label = QLabel("Exact phrase (filters by title)")
-        self.exact_label.setStyleSheet("font-weight: 600;")
-        self.exact_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-
-        self.exact = QCheckBox("")  # box is rendered to the right of the label
-        self.exact.setToolTip("Filters results by whether the phrase appears in the title.")
-        self.exact.setFixedSize(22, 22)
-        self.exact.setStyleSheet(
-            """
-            QCheckBox::indicator {
-              width: 16px;
-              height: 16px;
-              border: 2px solid #000000;
-              background-color: transparent;
-              border-radius: 2px;
-            }
-            """
-        )
-
-        exact_row = QWidget()
-        exact_layout = QHBoxLayout(exact_row)
-        exact_layout.setContentsMargins(0, 0, 0, 0)
-        exact_layout.setSpacing(6)
-        exact_layout.addWidget(self.exact_label, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        # Keep the square immediately next to the label (not pushed to the far right).
-        exact_layout.addWidget(self.exact, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        self.keyword.setPlaceholderText('e.g. UE-Mercosur OR "UE-Mercosur"')
         self.keyword.textChanged.connect(self._refresh_save_path)
 
         self.sortby = QComboBox()
@@ -507,14 +489,10 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.keyword, row, 1, 1, 3)
         row += 1
 
-        # Exact phrase option must sit between the keyword bar and the examples.
-        grid.addWidget(exact_row, row, 1, 1, 3)
-        row += 1
-
         self.instructions = QLabel(
             "Examples:\n"
             "- UE-Mercosur → General search\n"
-            '- "UE-Mercosur" → Exact phrase search\n'
+            '- "UE-Mercosur" → Exact title match\n'
             "- UE-Mercosur -transformer → Exclude specific term\n"
             '- UE-Mercosur author:"Geoffrey Hinton" → Search by author\n'
             "- UE-Mercosur source:Nature → Search within a specific publication\n"
@@ -586,97 +564,37 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         # No manual grip: resizing is edge-only for the frameless window.
 
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:  # type: ignore[override]
-        # Frameless resizing: detect clicks near window edges and resize accordingly.
-        # (We ignore title bar events so dragging the window still works normally.)
-        if event is None:
-            return False
-        if self.isMaximized():
-            return False
+    def _edge_bits_from_pos(self, pos) -> int:
+        x = pos.x()
+        y = pos.y()
+        e = self._resize_edge
 
-        # Only handle events relevant to resizing.
-        if event.type() not in (QEvent.MouseMove, QEvent.MouseButtonPress, QEvent.MouseButtonRelease):
-            return False
+        left = x <= e
+        right = x >= self.width() - e - 1
+        top = y <= e
+        bottom = y >= self.height() - e - 1
 
-        # Avoid interfering with the custom title bar drag.
-        if event.type() == QEvent.MouseButtonPress and obj == self.titlebar:
-            return False
-
-        # local position of cursor within the window
-        try:
-            gp = event.globalPosition().toPoint()  # type: ignore[attr-defined]
-        except Exception:
-            return False
-
-        lp = self.mapFromGlobal(gp)
-
-        # Ignore if cursor is outside the window rect.
-        if not self.rect().contains(lp):
-            if not self._resizing:
-                self.unsetCursor()
-            return False
-
-        EDGE = 6
-        left = lp.x() <= EDGE
-        right = lp.x() >= self.width() - EDGE
-        top = lp.y() <= EDGE
-        bottom = lp.y() >= self.height() - EDGE
-
-        edges = 0
+        bits = 0
         if left:
-            edges |= 1
+            bits |= 1
         if right:
-            edges |= 2
+            bits |= 2
         if top:
-            edges |= 4
+            bits |= 4
         if bottom:
-            edges |= 8
+            bits |= 8
+        return bits
 
-        if event.type() == QEvent.MouseMove:
-            if self._resizing:
-                if self._resize_start_pos is None or self._resize_start_geom is None:
-                    return True
-                dx = gp.x() - self._resize_start_pos.x()
-                dy = gp.y() - self._resize_start_pos.y()
-                g = self._resize_start_geom
-                active_edges = self._resize_edges
-                min_w = max(self.minimumWidth(), 200)
-                min_h = max(self.minimumHeight(), 200)
+    def mouseMoveEvent(self, event):  # noqa: N802
+        if self.isMaximized() or self.isFullScreen():
+            return super().mouseMoveEvent(event)
 
-                new_x = g.x()
-                new_y = g.y()
-                new_w = g.width()
-                new_h = g.height()
+        pos = event.position().toPoint()
+        edges = self._edge_bits_from_pos(pos)
 
-                if active_edges & 1:  # left
-                    new_x = g.x() + dx
-                    new_w = g.width() - dx
-                if active_edges & 2:  # right
-                    new_w = g.width() + dx
-                if active_edges & 4:  # top
-                    new_y = g.y() + dy
-                    new_h = g.height() - dy
-                if active_edges & 8:  # bottom
-                    new_h = g.height() + dy
-
-                # Enforce minimum size (and keep the "pinned" edge stable).
-                if new_w < min_w:
-                    if active_edges & 1:
-                        new_x = g.right() - (min_w - 1)
-                    new_w = min_w
-                if new_h < min_h:
-                    if active_edges & 4:
-                        new_y = g.bottom() - (min_h - 1)
-                    new_h = min_h
-
-                self.setGeometry(new_x, new_y, new_w, new_h)
-                return True
-
-            # Not resizing: update cursor if hovering over an edge.
-            if edges == 0:
-                self.unsetCursor()
-                return False
-
+        if edges == 0:
+            self.unsetCursor()
+        else:
             if (edges & 1 and edges & 4) or (edges & 2 and edges & 8):
                 self.setCursor(Qt.SizeFDiagCursor)
             elif (edges & 2 and edges & 4) or (edges & 1 and edges & 8):
@@ -685,44 +603,44 @@ class MainWindow(QMainWindow):
                 self.setCursor(Qt.SizeHorCursor)
             elif edges & (4 | 8):
                 self.setCursor(Qt.SizeVerCursor)
-            return False
 
-        if event.type() == QEvent.MouseButtonPress:
-            # Start resizing only when the click is near an edge.
-            if edges == 0:
-                return False
-            try:
-                btn = event.button()  # type: ignore[attr-defined]
-            except Exception:
-                return False
-            if btn != Qt.LeftButton:
-                return False
+        return super().mouseMoveEvent(event)
 
-            # If the user clicked a real control, don't start resizing.
-            # This keeps the "Exact phrase" checkbox reliably clickable.
-            clicked = self.childAt(lp)
-            if clicked is not None and isinstance(
-                clicked,
-                (QCheckBox, QComboBox, QLineEdit, QSpinBox, QPushButton, QTableView),
-            ):
-                return False
+    def mousePressEvent(self, event):  # noqa: N802
+        if event.button() != Qt.LeftButton:
+            return super().mousePressEvent(event)
+        if self.isMaximized() or self.isFullScreen():
+            return super().mousePressEvent(event)
 
-            # Anchor to the initial edges where the press happened.
-            self._resizing = True
-            self._resize_edges = edges
-            self._resize_start_pos = gp
-            self._resize_start_geom = self.geometry()
-            return True
+        pos = event.position().toPoint()
+        edges = self._edge_bits_from_pos(pos)
+        if edges == 0:
+            return super().mousePressEvent(event)
 
-        if event.type() == QEvent.MouseButtonRelease:
-            if self._resizing:
-                self._resizing = False
-                self._resize_edges = 0
-                self._resize_start_pos = None
-                self._resize_start_geom = None
+        # If the user clicked inside a real control, don't resize.
+        clicked = self.childAt(pos)
+        if clicked is not None and clicked != self and isinstance(
+            clicked,
+            (QCheckBox, QComboBox, QLineEdit, QSpinBox, QPushButton, QTableView, PlatinumTitleBar),
+        ):
+            return super().mousePressEvent(event)
+
+        handle = self.windowHandle()
+        if handle is not None:
+            qt_edges = Qt.Edge(0)
+            if edges & 1:
+                qt_edges |= Qt.Edge.LeftEdge
+            if edges & 2:
+                qt_edges |= Qt.Edge.RightEdge
+            if edges & 4:
+                qt_edges |= Qt.Edge.TopEdge
+            if edges & 8:
+                qt_edges |= Qt.Edge.BottomEdge
+            if qt_edges and handle.startSystemResize(qt_edges):
+                event.accept()
                 return True
 
-        return False
+        return super().mousePressEvent(event)
 
     def _install_shortcuts(self) -> None:
         act = QAction(self)
@@ -731,22 +649,27 @@ class MainWindow(QMainWindow):
         self.addAction(act)
 
     def paintEvent(self, event):  # noqa: N802
-        # When full-screen, let the OS draw clean edges.
-        if self.isFullScreen():
-            super().paintEvent(event)
-            return
+        super().paintEvent(event)
 
-        # Chunky 3px beveled border: light top-left, dark bottom-right.
+        # Old Mac OS-style multi-layer bevel border.
         p = QPainter(self)
         r = self.rect()
-        for i in range(3):
-            p.setPen(QColor(PAL.surface))
+        thickness = max(2, self._frame_margin)
+
+        light_steps = ["#FFFFFF", "#E9E9E9", "#D2D2D2", "#BDBDBD", "#A9A9A9", "#9A9A9A"]
+        dark_steps = ["#7A7A7A", "#676767", "#515151", "#3F3F3F", "#2F2F2F", "#222222"]
+
+        for i in range(thickness):
+            lc = QColor(light_steps[min(i, len(light_steps) - 1)])
+            dc = QColor(dark_steps[min(i, len(dark_steps) - 1)])
+
+            p.setPen(lc)
             p.drawLine(r.left() + i, r.top() + i, r.right() - i, r.top() + i)
             p.drawLine(r.left() + i, r.top() + i, r.left() + i, r.bottom() - i)
-            p.setPen(QColor(PAL.shadow))
+
+            p.setPen(dc)
             p.drawLine(r.left() + i, r.bottom() - i, r.right() - i, r.bottom() - i)
             p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
-        super().paintEvent(event)
 
     def _refresh_save_path(self) -> None:
         keyword = (self.keyword.text() or "").strip()
@@ -800,7 +723,6 @@ class MainWindow(QMainWindow):
 
         return SearchParams(
             keyword=keyword,
-            exact_phrase=self.exact.isChecked(),
             sortby=self.sortby.currentText(),
             nresults=int(self.nresults.value()),
             start_year=start_year,
