@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QKeySequence, QPainter, QPen
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt, QThread, QTimer, Signal, QUrl
+from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QKeySequence, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -92,6 +92,19 @@ class ResultsModel(QAbstractTableModel):
         if role == Qt.DisplayRole:
             v = self.rows[r][c]
             return "" if v is None else str(v)
+
+        if role in (Qt.ForegroundRole, Qt.FontRole):
+            try:
+                v = self.rows[r][c]
+                s = "" if v is None else str(v)
+                if s.startswith("http://") or s.startswith("https://"):
+                    if role == Qt.ForegroundRole:
+                        return QColor(PAL.blue)
+                    f = QFont()
+                    f.setUnderline(True)
+                    return f
+            except Exception:
+                return None
 
         if role == Qt.BackgroundRole:
             # Zebra rows: #F0F0F0 / #FFFFFF
@@ -179,7 +192,7 @@ def _export_results(headers: List[str], rows: List[List[Any]], fmt: str, out_pat
 class RainbowHeader(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.setFixedHeight(18)
+        self.setFixedHeight(34)
         self._tick = 0
         self._timer = QTimer(self)
         self._timer.setInterval(120)  # 8-bit-ish pacing
@@ -215,6 +228,8 @@ class RainbowHeader(QWidget):
 
 class PlatinumTitleBar(QWidget):
     close_clicked = Signal()
+    minimize_clicked = Signal()
+    zoom_clicked = Signal()
 
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
@@ -236,17 +251,36 @@ class PlatinumTitleBar(QWidget):
 
     def mouseDoubleClickEvent(self, event):  # noqa: N802
         # "Zoom" behavior on title bar double click (simple maximize toggle)
-        w = self.window()
-        w.setWindowState(w.windowState() ^ Qt.WindowMaximized)
+        self.zoom_clicked.emit()
 
-    def _close_rect(self):
-        return (10, 7, 12, 12)
+    def _button_rects(self):
+        # Right side cluster, ordered: yellow(min), green(max), red(close)
+        size = 12
+        gap = 6
+        y = 7
+        x_right = self.width() - 10
+        red = (x_right - size, y, size, size)
+        green = (x_right - size - gap - size, y, size, size)
+        yellow = (x_right - size - gap - size - gap - size, y, size, size)
+        return yellow, green, red
 
     def mouseReleaseEvent(self, event):  # type: ignore[override]  # noqa: N802
         if event.button() == Qt.LeftButton:
-            x, y, w, h = self._close_rect()
-            if x <= event.position().x() <= x + w and y <= event.position().y() <= y + h:
-                self.close_clicked.emit()
+            px, py = event.position().x(), event.position().y()
+            yellow, green, red = self._button_rects()
+            for which, (x, y, w, h) in (
+                ("min", yellow),
+                ("zoom", green),
+                ("close", red),
+            ):
+                if x <= px <= x + w and y <= py <= y + h:
+                    if which == "close":
+                        self.close_clicked.emit()
+                    elif which == "min":
+                        self.minimize_clicked.emit()
+                    else:
+                        self.zoom_clicked.emit()
+                    break
         self._drag_pos = None
         event.accept()
 
@@ -259,15 +293,22 @@ class PlatinumTitleBar(QWidget):
         for yy in range(0, self.height(), 2):
             p.drawLine(0, yy, self.width(), yy)
 
-        # Title text
-        p.setPen(QColor(PAL.shadow))
-        p.drawText(34, 0, self.width() - 34, self.height(), Qt.AlignVCenter | Qt.AlignLeft, APP_NAME)
+        # Window buttons: yellow(min), green(max), red(close) on the right
+        yellow, green, red = self._button_rects()
+        for (x, y, w, h), fill in (
+            (yellow, "#F5BC00"),
+            (green, "#6ABD45"),
+            (red, "#E2231A"),
+        ):
+            p.setPen(QColor("#000000"))
+            p.setBrush(QColor(fill))
+            p.drawRect(x, y, w, h)
 
-        # Close box: small square with 1px black outline
-        x, y, w, h = self._close_rect()
-        p.setPen(QColor("#000000"))
-        p.setBrush(QColor(PAL.chrome))
-        p.drawRect(x, y, w, h)
+        # Title text (avoid button cluster)
+        p.setPen(QColor(PAL.shadow))
+        left_pad = 10
+        right_limit = yellow[0] - 10
+        p.drawText(left_pad, 0, max(0, right_limit - left_pad), self.height(), Qt.AlignVCenter | Qt.AlignLeft, APP_NAME)
 
 
 class MainWindow(QMainWindow):
@@ -285,6 +326,8 @@ class MainWindow(QMainWindow):
 
         self.titlebar = PlatinumTitleBar(outer)
         self.titlebar.close_clicked.connect(self.close)
+        self.titlebar.minimize_clicked.connect(self.showMinimized)
+        self.titlebar.zoom_clicked.connect(self._toggle_maximize)
         outer_layout.addWidget(self.titlebar)
         outer_layout.addWidget(RainbowHeader())
 
@@ -411,6 +454,19 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.keyword, row, 1, 1, 3)
         row += 1
 
+        self.instructions = QLabel(
+            "Examples:\n"
+            "- Exact phrase: \"diffusion models\"\n"
+            "- OR: (diffusion OR denoising)\n"
+            "- Exclude: diffusion -survey\n"
+            "- Grouping: (diffusion OR denoising) medical\n"
+            "Tip: turn on “Extra delay (safer)” + fewer results to avoid blocks."
+        )
+        self.instructions.setStyleSheet(f"color: {PAL.shadow};")
+        self.instructions.setWordWrap(True)
+        grid.addWidget(self.instructions, row, 1, 1, 3)
+        row += 1
+
         grid.addWidget(self.exact, row, 1, 1, 3)
         row += 1
 
@@ -448,16 +504,8 @@ class MainWindow(QMainWindow):
         self.open_btn.clicked.connect(self._open_folder)
         self.open_btn.setEnabled(False)
 
-        self.fullscreen_btn = QPushButton("Full screen")
-        self.fullscreen_btn.clicked.connect(self._toggle_fullscreen)
-
-        self.help_btn = QPushButton("Search tips")
-        self.help_btn.clicked.connect(self._show_search_tips)
-
         buttons.addWidget(self.run_btn)
         buttons.addWidget(self.open_btn)
-        buttons.addWidget(self.fullscreen_btn)
-        buttons.addWidget(self.help_btn)
         buttons.addStretch(1)
 
         self.status = QLabel("Ready.")
@@ -475,6 +523,7 @@ class MainWindow(QMainWindow):
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setSortingEnabled(False)
+        self.table.clicked.connect(self._on_table_clicked)
         root.addWidget(self.table, 1)
 
         self._last_saved: Optional[Path] = None
@@ -507,29 +556,23 @@ class MainWindow(QMainWindow):
         out = Path.home() / "Downloads" / f"{base}.{ext}"
         self.save_to.setText(str(out))
 
+    def _toggle_maximize(self) -> None:
+        self.setWindowState(self.windowState() ^ Qt.WindowMaximized)
+
     def _toggle_fullscreen(self) -> None:
         if self.isFullScreen():
             self.showNormal()
-            self.fullscreen_btn.setText("Full screen")
         else:
             self.showFullScreen()
-            self.fullscreen_btn.setText("Exit full screen")
 
-    def _show_search_tips(self) -> None:
-        QMessageBox.information(
-            self,
-            "Search tips",
-            "You can use Google-style operators in your keyword:\n\n"
-            "- Exact phrase: put it in quotes, like: \"diffusion models\"\n"
-            "- AND: just type both words (Scholar treats it like AND)\n"
-            "- OR: use OR in caps, like: (diffusion OR denoising)\n"
-            "- Exclude words: use a minus, like: diffusion -survey\n"
-            "- Grouping: use parentheses, like: (diffusion OR denoising) medical\n\n"
-            "Tips to avoid blocks:\n"
-            "- Turn on “Extra delay (safer)”\n"
-            "- Ask for fewer results (25–50)\n"
-            "- If blocked, wait a few minutes and try again",
-        )
+    def _on_table_clicked(self, index: QModelIndex) -> None:
+        try:
+            v = self.model.data(index, Qt.DisplayRole)
+            s = "" if v is None else str(v)
+            if s.startswith("http://") or s.startswith("https://"):
+                QDesktopServices.openUrl(QUrl(s))
+        except Exception:
+            return
 
     def _open_folder(self) -> None:
         if not self._last_saved:
