@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import csv
 import datetime
+import os
 import re
 import subprocess
+import tempfile
 import sys
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
+import shutil
+import stat
 from typing import Any, List, Optional, Tuple
 
 from PySide6.QtCore import QAbstractTableModel, QEvent, QModelIndex, QObject, Qt, QThread, QTimer, Signal, QUrl
@@ -36,6 +40,252 @@ from theme import PAL, qss
 
 
 APP_NAME = "Citatio"
+
+
+def _resolve_dist_icon() -> Path | None:
+    """
+    Return the icon file shipped in `dist/` (if present).
+    Used for the Desktop shortcut icon on platforms that support it.
+    """
+    base_dir = Path(__file__).resolve().parent
+    # Keep aligned with the existing window icon lookup.
+    ico = base_dir / "dist" / "svgviewer-output (3) (1).ico"
+    if ico.exists():
+        return ico
+    asset_ico = base_dir / "assets" / "icon.ico"
+    return asset_ico if asset_ico.exists() else None
+
+
+def _desktop_dir() -> Path:
+    # Most setups put Desktop under the home folder across Win/mac/Linux.
+    return Path.home() / "Desktop"
+
+
+def _ps_quote(s: str) -> str:
+    # Single-quoted PowerShell string literal.
+    return "'" + s.replace("'", "''") + "'"
+
+
+def _try_make_macos_icns_from_ico(ico_path: Path, out_icns_path: Path) -> bool:
+    """
+    Best-effort conversion from `.ico` to `.icns` using built-in macOS tools.
+    Returns True if the `.icns` is created.
+    """
+    if sys.platform != "darwin":
+        return False
+
+    if not shutil.which("sips") or not shutil.which("iconutil"):
+        return False
+
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            base_png = td_path / "icon.png"
+
+            # sips can often read .ico; if it can't, conversion will fail.
+            subprocess.run(
+                ["sips", "-s", "format", "png", str(ico_path), "--out", str(base_png)],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if not base_png.exists():
+                return False
+
+            iconset = td_path / "Icon.iconset"
+            iconset.mkdir(parents=True, exist_ok=True)
+
+            sizes = [
+                ("icon_16x16.png", 16, 16),
+                ("icon_16x16@2x.png", 32, 32),
+                ("icon_32x32.png", 32, 32),
+                ("icon_32x32@2x.png", 64, 64),
+                ("icon_128x128.png", 128, 128),
+                ("icon_128x128@2x.png", 256, 256),
+                ("icon_256x256.png", 256, 256),
+                ("icon_256x256@2x.png", 512, 512),
+                ("icon_512x512.png", 512, 512),
+                ("icon_512x512@2x.png", 1024, 1024),
+            ]
+            for name, w, h in sizes:
+                out_png = iconset / name
+                subprocess.run(
+                    ["sips", "-z", str(h), str(w), str(base_png), "--out", str(out_png)],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+
+            subprocess.run(
+                ["iconutil", "-c", "icns", str(iconset), "-o", str(out_icns_path)],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return out_icns_path.exists()
+    except Exception:
+        return False
+
+
+def _maybe_create_desktop_shortcut() -> None:
+    """
+    Create an OS-appropriate Desktop shortcut launcher if one doesn't already exist.
+    - Windows: `Citatio.lnk`
+    - macOS: `Citatio.app` (minimal launcher)
+    - Linux: `Citatio.desktop`
+    """
+    try:
+        desktop_dir = _desktop_dir()
+        icon_path = _resolve_dist_icon()
+        script_path = Path(__file__).resolve()
+        work_dir = script_path.parent
+
+        if sys.platform.startswith("win"):
+            desktop_dir.mkdir(parents=True, exist_ok=True)
+            link_path = desktop_dir / f"{APP_NAME}.lnk"
+            if link_path.exists():
+                return
+
+            exe_path = work_dir / "dist" / f"{APP_NAME}.exe"
+            if exe_path.exists():
+                target_path = str(exe_path)
+                arguments = ""
+                working_directory = str(exe_path.parent)
+            else:
+                # Fallback: run the Python app directly.
+                target_path = sys.executable
+                arguments = str(script_path)
+                working_directory = str(work_dir)
+
+            # Create/overwrite the Windows LNK safely.
+            ps_cmd = (
+                "$WshShell = New-Object -ComObject WScript.Shell; "
+                f"$Shortcut = $WshShell.CreateShortcut({_ps_quote(str(link_path))}); "
+                f"$Shortcut.TargetPath = {_ps_quote(target_path)}; "
+                f"$Shortcut.Arguments = {_ps_quote(arguments)}; "
+                f"$Shortcut.WorkingDirectory = {_ps_quote(working_directory)}; "
+            )
+            if icon_path is not None:
+                ps_cmd += f"$Shortcut.IconLocation = {_ps_quote(str(icon_path))}; "
+            ps_cmd += "$Shortcut.Save();"
+
+            subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return
+
+        if sys.platform == "darwin":
+            desktop_dir.mkdir(parents=True, exist_ok=True)
+            app_path = desktop_dir / f"{APP_NAME}.app"
+            if app_path.exists():
+                return
+
+            dist_app_path = work_dir / "dist" / f"{APP_NAME}.app"
+            built_exec = dist_app_path / "Contents" / "MacOS" / APP_NAME
+
+            contents = app_path / "Contents"
+            macos_dir = contents / "MacOS"
+            resources_dir = contents / "Resources"
+            macos_dir.mkdir(parents=True, exist_ok=True)
+            resources_dir.mkdir(parents=True, exist_ok=True)
+
+            # Launcher executable (a shell script) so we don't need bundling Python.
+            launcher_path = macos_dir / APP_NAME
+            if built_exec.exists():
+                exec_target_line = f'exec "{str(built_exec)}" "$@"'
+            else:
+                exec_target_line = f'exec "{sys.executable}" "{str(script_path)}" "$@"'
+            launcher_path.write_text(
+                "\n".join(
+                    [
+                        "#!/bin/bash",
+                        "set -e",
+                        exec_target_line,
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            launcher_path.chmod(
+                launcher_path.stat().st_mode
+                | stat.S_IXUSR
+                | stat.S_IXGRP
+                | stat.S_IXOTH
+            )
+
+            icns_path = resources_dir / "Icon.icns"
+            icon_ok = False
+            if icon_path is not None:
+                icon_ok = _try_make_macos_icns_from_ico(icon_path, icns_path)
+
+            icon_file_line = (
+                "<key>CFBundleIconFile</key>\n\t\t<string>Icon</string>\n\t"
+                if icon_ok
+                else ""
+            )
+            info_plist = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+\t<key>CFBundleDevelopmentRegion</key>
+\t<string>en</string>
+\t<key>CFBundleExecutable</key>
+\t<string>{APP_NAME}</string>
+\t<key>CFBundleIdentifier</key>
+\t<string>com.citatio.app</string>
+\t<key>CFBundleName</key>
+\t<string>{APP_NAME}</string>
+\t<key>CFBundlePackageType</key>
+\t<string>APPL</string>
+\t<key>CFBundleSignature</key>
+\t<string>????</string>
+\t<key>NSHighResolutionCapable</key>
+\t<true/>
+{icon_file_line}</dict>
+</plist>
+"""
+            (contents / "Info.plist").write_text(info_plist, encoding="utf-8")
+            return
+
+        # Linux / other Unix-like.
+        desktop_dir.mkdir(parents=True, exist_ok=True)
+        desktop_file = desktop_dir / f"{APP_NAME}.desktop"
+        if desktop_file.exists():
+            return
+
+        dist_bin = work_dir / "dist" / APP_NAME
+        if dist_bin.exists():
+            exec_cmd = f'"{str(dist_bin)}"'
+        else:
+            exec_cmd = f'"{sys.executable}" "{str(script_path)}"'
+
+        icon_field = f"Icon={icon_path}\n" if icon_path is not None else ""
+
+        content = (
+            "[Desktop Entry]\n"
+            "Type=Application\n"
+            f"Name={APP_NAME}\n"
+            f"{icon_field}"
+            f"Exec={exec_cmd}\n"
+            "Terminal=false\n"
+            "Categories=Education;Science;\n"
+        )
+        desktop_file.write_text(content, encoding="utf-8")
+        try:
+            desktop_file.chmod(
+                desktop_file.stat().st_mode
+                | stat.S_IXUSR
+                | stat.S_IXGRP
+                | stat.S_IXOTH
+            )
+        except Exception:
+            pass
+    except Exception:
+        # Never block app startup on shortcut creation issues.
+        return
 
 
 def _sanitize_filename(s: str) -> str:
@@ -607,6 +857,9 @@ class MainWindow(QMainWindow):
 
         self._last_saved: Optional[Path] = None
         self._install_shortcuts()
+        # Create a Desktop shortcut so users can quickly launch the app later.
+        # This is safe: we check existence first and never overwrite anything.
+        _maybe_create_desktop_shortcut()
         self._refresh_save_path()
 
     def resizeEvent(self, event):  # noqa: N802

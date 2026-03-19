@@ -119,16 +119,54 @@ python3 -m pip install -r requirements.txt
 python3 Citatio.py
 ```
 
-## Build a Windows EXE (optional)
+## Build App Files (optional)
 
-Windows-only right now (uses the PowerShell build script).
+If you want a “double-click / run directly” app instead of `Citatio.py`, you can build packaged versions with PyInstaller.
 
 From `desktop/`:
+
+### Windows
 ```powershell
 .\build_windows.ps1
 ```
+Output: `desktop/dist/Citatio.exe`
 
-The EXE will be created at `desktop/dist/Citatio.exe`.
+### macOS
+```bash
+chmod +x ./build_macos.sh
+./build_macos.sh
+```
+Output: `desktop/dist/Citatio.app`
+
+### Linux
+```bash
+chmod +x ./build_linux.sh
+./build_linux.sh
+```
+Output: `desktop/dist/Citatio`
+
+## Run the packaged app (adds Desktop shortcut)
+
+From `desktop/`:
+
+### Windows
+```powershell
+.\run_packaged_and_install.bat
+```
+
+### macOS
+```bash
+chmod +x ./run_packaged_and_install.sh
+./run_packaged_and_install.sh
+```
+
+### Linux
+```bash
+chmod +x ./run_packaged_and_install.sh
+./run_packaged_and_install.sh
+```
+
+This opens the built app/exe from `desktop/dist/` and creates a Desktop shortcut for the current user (if needed).
 
 ## Reopen the app later (no re-install needed)
 
