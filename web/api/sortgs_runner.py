@@ -1,16 +1,72 @@
 """
-Google Scholar search via SerpAPI.
-Retorna (headers, rows) para CSV.
+Google Scholar search by scraping HTML.
+
+Returns `(headers, rows)` with a stable column order expected by `web/api/search.py`
+and the React frontend:
+["Rank", "Author", "Title", "Citations", "Year", "Venue", "Abstract", "Source", "PDF", "cit/year"]
 """
+
 import datetime
-import os
+import re
+import time
 from typing import List, Optional, Tuple, Union
 
 import requests
+from bs4 import BeautifulSoup
 
 NOW = datetime.datetime.now()
-HEADERS = ["Rank", "Author", "Title", "Citations", "Year", "Venue", "Abstract", "Source", "PDF", "cit/year"]
-SERPAPI_URL = "https://serpapi.com/search.json"
+HEADERS = [
+    "Rank",
+    "Author",
+    "Title",
+    "Citations",
+    "Year",
+    "Venue",
+    "Abstract",
+    "Source",
+    "PDF",
+    "cit/year",
+]
+
+GSCHOLAR_URL = "https://scholar.google.com/scholar?start={}&q={}&hl=en&as_sdt=0,5"
+STARTYEAR_URL = "&as_ylo={}"
+ENDYEAR_URL = "&as_yhi={}"
+LANG_URL = "&lr={}"
+
+ROBOT_KW = ["unusual traffic from your computer network", "not a robot"]
+
+
+def _get_citations(content: str) -> int:
+    match = re.search(r"Cited by (\d+)", content)
+    return int(match.group(1)) if match else 0
+
+
+def _get_year(content: str) -> int:
+    match = re.search(r"\b(19|20)\d{2}\b", content)
+    return int(match.group(0)) if match else 0
+
+
+def _get_author(gs_a_text: str) -> str:
+    clean = (gs_a_text or "").replace("\xa0", " ").strip()
+    return clean.split(" - ")[0] if clean else ""
+
+
+def _format_lang(langs: List[str]) -> str:
+    # Google Scholar expects: lang_x|lang_y
+    if len(langs) == 1:
+        return f"lang_{langs[0]}"
+    return "%7C".join(f"lang_{s}" for s in langs)
+
+
+def _get_pdf_link(div) -> Optional[str]:
+    try:
+        pdf_div = div.find("div", {"class": "gs_ggs gs_fl"})
+        if not pdf_div:
+            return None
+        a_tag = pdf_div.find("a")
+        return a_tag.get("href") if a_tag else None
+    except Exception:
+        return None
 
 
 def run_search_semantic_scholar(
@@ -22,117 +78,103 @@ def run_search_semantic_scholar(
     langfilter: Union[str, list] = "All",
     debug: bool = False,
     delay_seconds: float = 0,
-    request_timeout: float = 8,
+    request_timeout: float = 10,
 ) -> Tuple[List[str], List[List]]:
+    """
+    Scrape Google Scholar results pages.
 
-    api_key = os.environ.get("SERPAPI_KEY", "").strip()
-    if not api_key:
-        raise RuntimeError("SERPAPI_KEY no configurada. Agregala como variable de entorno en Vercel.")
-
+    Note: Vercel serverless may be blocked by Google Scholar (CAPTCHA). We raise a
+    friendly error so the UI can show what happened.
+    """
     end_year = end_year or NOW.year
     query = keyword.strip().strip("'\"").strip()
     if not query:
         return (HEADERS, [])
 
+    main_url = GSCHOLAR_URL
+    if start_year:
+        main_url = main_url + STARTYEAR_URL.format(start_year)
+    if end_year != NOW.year:
+        main_url = main_url + ENDYEAR_URL.format(end_year)
+    if langfilter != "All" and isinstance(langfilter, list) and langfilter:
+        main_url = main_url + LANG_URL.format(_format_lang([str(x) for x in langfilter]))
+    if debug:
+        # Useful for unit testing without hitting Scholar repeatedly.
+        main_url = "https://web.archive.org/web/20210314203256/" + main_url
+
     session = requests.Session()
-    all_results: List[dict] = []
-    start = 0
-    # Pedimos como máximo 100 resultados efectivos en la versión web
-    target_results = min(nresults, 100)
+    headers: List[str] = HEADERS
+    rows: List[List] = []
 
-    while len(all_results) < target_results:
-        params = {
-            "engine": "google_scholar",
-            "q": query,
-            "api_key": api_key,
-            "num": 10,
-            "start": start,
-            "hl": "en",
-        }
-        if start_year:
-            params["as_ylo"] = start_year
-        if end_year != NOW.year:
-            params["as_yhi"] = end_year
-
+    # Scholar paginates in blocks of 10 results.
+    target_results = max(10, nresults)
+    for n in range(0, target_results, 10):
+        page_url = main_url.format(str(n), query.replace(" ", "+"))
         try:
-            r = session.get(SERPAPI_URL, params=params, timeout=request_timeout)
-            r.raise_for_status()
-            data = r.json()
-        except requests.Timeout as e:
-            # Si ya tenemos resultados acumulados, devolverlos en lugar de fallar toda la búsqueda
-            if all_results:
-                break
-            raise RuntimeError(
-                "SerpAPI tardó demasiado en responder. Probá de nuevo en unos segundos."
-            ) from e
+            resp = session.get(page_url, timeout=request_timeout)
+            resp.raise_for_status()
+            html = resp.text
         except Exception as e:
-            raise RuntimeError(f"Error al conectar con SerpAPI: {e}")
+            raise RuntimeError(f"Error al solicitar Google Scholar: {e}") from e
 
-        if "error" in data:
-            raise RuntimeError(f"SerpAPI error: {data['error']}")
+        lowered = html.lower()
+        if any(kw in lowered for kw in ROBOT_KW):
+            raise RuntimeError(
+                "Google Scholar bloqueó el acceso (CAPTCHA/robot check). "
+                "Espera un momento y vuelve a intentar, o prueba con menos búsquedas."
+            )
 
-        results = data.get("organic_results") or []
-        if not results:
+        soup = BeautifulSoup(html, "html.parser")
+        result_divs = soup.find_all("div", {"class": "gs_or"})
+        if not result_divs:
             break
 
-        all_results.extend(results)
-        start += len(results)
+        for div in result_divs:
+            gs_a = div.find("div", {"class": "gs_a"})
+            gs_a_text = gs_a.get_text(" ", strip=True) if gs_a else ""
 
-        # SerpAPI devuelve de a 10; si devolvió menos de 10 no hay más páginas
-        if len(results) < 10:
+            h3 = div.find("h3")
+            a_tag = h3.find("a") if h3 else None
+            title = a_tag.get_text(" ", strip=True) if a_tag else "Could not catch title"
+            source = a_tag.get("href") if a_tag and a_tag.has_attr("href") else ""
+
+            citations = _get_citations(str(div))
+            year = _get_year(gs_a_text)
+            author = _get_author(gs_a_text) or "Unknown"
+
+            # Venue: in Scholar this comes from the "Author - Venue, Year" text line.
+            parts = gs_a_text.split(" - ")
+            venue = parts[1].strip() if len(parts) >= 2 else "—"
+
+            content_div = div.find("div", {"class": "gs_rs"})
+            abstract = content_div.get_text(" ", strip=True) if content_div else "Content not found"
+
+            pdf_link = _get_pdf_link(div) or "No PDF link"
+
+            denom = max(1, end_year + 1 - min(year, end_year))
+            cit_per_year = int(round(citations / denom, 0)) if year else 0
+
+            rows.append([0, author, title, citations, year, venue, abstract, source, pdf_link, cit_per_year])
+
+            if len(rows) >= target_results:
+                break
+
+        if delay_seconds > 0:
+            time.sleep(delay_seconds)
+
+        if len(rows) >= target_results:
             break
 
-    rows = []
-    for p in all_results:
-        title = (p.get("title") or "No title").strip()
+    # Sort rows by selected column.
+    try:
+        sort_idx = 9 if sortby == "cit/year" else 3
+        rows.sort(key=lambda r: r[sort_idx], reverse=True)
+    except Exception:
+        rows.sort(key=lambda r: r[3], reverse=True)
 
-        # Citas
-        inline = p.get("inline_links") or {}
-        cited_by = inline.get("cited_by") or {}
-        citations = int(cited_by.get("total") or 0)
-
-        # Año
-        pub_info = p.get("publication_info") or {}
-        summary = pub_info.get("summary") or ""
-        year = 0
-        import re
-        m = re.search(r"\b(19|20)\d{2}\b", summary)
-        if m:
-            year = int(m.group(0))
-
-        # Autores
-        authors_list = pub_info.get("authors") or []
-        if authors_list:
-            author = ", ".join(a.get("name", "") for a in authors_list)
-        else:
-            # fallback: primer fragmento antes del primer " - " en summary
-            author = summary.split(" - ")[0].strip() if summary else "Unknown"
-
-        # Venue
-        parts = summary.split(" - ")
-        venue = parts[1].strip() if len(parts) >= 2 else "—"
-
-        # Abstract
-        abstract = (p.get("snippet") or "—").strip()
-
-        # Links
-        url = (p.get("link") or "—").strip()
-        resources = p.get("resources") or []
-        pdf = next(
-            (r["link"] for r in resources if isinstance(r, dict) and "pdf" in (r.get("file_format") or "").lower()),
-            "No PDF link"
-        )
-
-        denom = max(1, end_year + 1 - min(year or end_year, end_year))
-        cit_per_year = round(citations / denom, 1) if year else 0
-
-        rows.append([0, author, title, citations, year, venue, abstract, url, pdf, cit_per_year])
-
-    # Ordenar
-    sort_idx = 9 if sortby == "cit/year" else 3
-    rows.sort(key=lambda r: r[sort_idx], reverse=True)
     rows = rows[:target_results]
     for i, row in enumerate(rows, 1):
         row[0] = i
 
-    return (HEADERS, rows)
+    return (headers, rows)
+

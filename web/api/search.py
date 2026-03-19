@@ -26,7 +26,10 @@ def _json_response(handler: BaseHTTPRequestHandler, status: int, payload: dict):
 
 
 def _load_runner():
-    """Load sortgs_runner. Uses Semantic Scholar API (reliable); no scraping."""
+    """
+    Load sortgs_runner (SerpAPI runner).
+    Vercel runs this file as an isolated function, so we add the API folder to sys.path.
+    """
     _api_dir = Path(__file__).resolve().parent
     if str(_api_dir) not in sys.path:
         sys.path.insert(0, str(_api_dir))
@@ -36,6 +39,7 @@ def _load_runner():
 
 
 class handler(BaseHTTPRequestHandler):
+    # Vercel serverless: keep logs quiet
     def log_message(self, format, *args):
         pass
 
@@ -64,6 +68,7 @@ class handler(BaseHTTPRequestHandler):
             return _json_response(
                 self, 500, {"error": f"Dependency load failed: {type(e).__name__}: {str(e)}"}
             )
+
         try:
             length = int(self.headers.get("Content-Length", "0"))
             raw = self.rfile.read(length) if length > 0 else b"{}"
@@ -104,7 +109,9 @@ class handler(BaseHTTPRequestHandler):
             nresults = int(nresults)
         except Exception:
             nresults = 100
-        nresults = max(10, min(100, nresults))
+        # Vercel stability: scraping Google Scholar directly can be slow / blocked.
+        # Keep this conservative.
+        nresults = max(10, min(30, nresults))
 
         fmt = str(data.get("format", "csv")).lower()
         if fmt not in ("xlsx", "csv"):
@@ -127,7 +134,7 @@ class handler(BaseHTTPRequestHandler):
 
         if exact_phrase and phrase:
             lowered = phrase.lower()
-            # Título está en la columna 2 según HEADERS del runner
+            # Titles are in rows[][2] based on runner HEADERS
             rows = [row for row in rows if lowered in str(row[2]).lower()]
 
         if not rows:
@@ -170,3 +177,4 @@ class handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         self.wfile.write(payload)
+

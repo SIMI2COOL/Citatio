@@ -11,3 +11,4 @@
     { "source": "/:path((?!api/).*)", "destination": "/index.html" }
   ]
 }
+
