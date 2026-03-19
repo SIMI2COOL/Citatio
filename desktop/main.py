@@ -249,14 +249,15 @@ class BevelFrame(QWidget):
     def paintEvent(self, event):  # noqa: N802
         p = QPainter(self)
         r = self.rect()
-        thickness = 10
+        thickness = 20
 
         # We draw a multi-offset bevel border by repeatedly drawing 4 border lines
         # (top/bottom/left/right) for each pixel offset from the outer edge.
         # - Top/left: bright highlight, then inner gray
         # - Bottom/right: dark shadow, then inner gray
-        highlight_px = 4
-        inner_px = 3  # total inner region (highlight_px..highlight_px+inner_px-1)
+        # Scale the highlight/inner bands with total thickness.
+        highlight_px = max(2, thickness // 3)
+        inner_px = max(2, thickness // 3)  # inner gray thickness
 
         for i in range(thickness):
             top_left_pen = (
@@ -385,7 +386,7 @@ class MainWindow(QMainWindow):
 
         # Frameless window frame (Mac OS-style bevel).
         # Keep this in sync with the bevel thickness drawn in paintEvent().
-        self._frame_margin = 10
+        self._frame_margin = 20
         # Wider hit area so resizing feels dynamic even while dragging quickly.
         self._resize_edge = 7
 
