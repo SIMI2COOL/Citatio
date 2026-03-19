@@ -96,9 +96,9 @@ git --version
 ```powershell
 git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
-cd Citatio/desktop
-py -m pip install -r requirements.txt
-py -m Citatio
+cd Citatio
+py -m pip install -r .\desktop\requirements.txt
+.\run.bat
 ```
 
 
@@ -107,9 +107,10 @@ py -m Citatio
 ```bash
 git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
-cd Citatio/desktop
-python3 -m pip install -r requirements.txt
-python3 -m Citatio
+cd Citatio
+python3 -m pip install -r ./desktop/requirements.txt
+chmod +x ./run.sh
+./run.sh
 ```
 
 ## Linux (Terminal)
@@ -117,15 +118,20 @@ python3 -m Citatio
 ```bash
 git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
-cd Citatio/desktop
-python3 -m pip install -r requirements.txt
-python3 -m Citatio
+cd Citatio
+python3 -m pip install -r ./desktop/requirements.txt
+chmod +x ./run.sh
+./run.sh
 ```
 
 ## Reopen the app later
 
 After the app is built, it is saved in `Citatio/desktop/dist/`.
 You can add it to your Desktop with the icon, so you can just double click it to open.
+
+From the repo root, you can also run:
+- Windows: `.\run.bat`
+- macOS/Linux: `./run.sh`
 
 ## Search tips ✨
 
