@@ -1,6 +1,6 @@
 # Citatio
 
-Desktop app to search Google Scholar and export results.
+Desktop app that ranks the most-cited papers and downloads an organized results table as CSV or XLSX.
 
 ## Install & run (all systems)
 
