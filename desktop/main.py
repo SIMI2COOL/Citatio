@@ -355,8 +355,9 @@ class MainWindow(QMainWindow):
         grid.setColumnStretch(3, 1)
 
         self.keyword = QLineEdit()
-        self.keyword.setPlaceholderText("e.g. diffusion models medical imaging")
+        self.keyword.setPlaceholderText("e.g. \"UE-Mercosur\" OR \"diffusion models\"")
         self.exact = QCheckBox("Exact phrase (filters by title)")
+        self.exact.setStyleSheet("font-weight: 600;")
         self.keyword.textChanged.connect(self._refresh_save_path)
 
         self.sortby = QComboBox()
@@ -376,11 +377,13 @@ class MainWindow(QMainWindow):
         self.start_year.setRange(0, this_year)
         self.start_year.setSpecialValueText("Any")
         self.start_year.setValue(0)
+        self.start_year.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.end_year = QSpinBox()
         self.end_year.setRange(0, this_year)
         self.end_year.setSpecialValueText("Any")
         self.end_year.setValue(0)
+        self.end_year.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.lang = QComboBox()
         self._lang_map = {
@@ -460,17 +463,20 @@ class MainWindow(QMainWindow):
         self.save_hint.setStyleSheet(f"color: {PAL.edge};")
 
         row = 0
-        grid.addWidget(QLabel("Keyword"), row, 0)
+        grid.addWidget(QLabel("Keyword"), row, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
         grid.addWidget(self.keyword, row, 1, 1, 3)
+        row += 1
+
+        grid.addWidget(self.exact, row, 1, 1, 3)
         row += 1
 
         self.instructions = QLabel(
             "Examples:\n"
-            "- Exact phrase: \"diffusion models\"\n"
-            "- OR: (diffusion OR denoising)\n"
-            "- Exclude: diffusion -survey\n"
-            "- Grouping: (diffusion OR denoising) medical\n"
-            "Tip: turn on “Extra delay” + fewer results to avoid blocks."
+            "- \"UE-Mercosur\" (exact phrase)\n"
+            "- UE Mercosur agriculture (both words)\n"
+            "- UE OR Mercosur (either term)\n"
+            "- UE -Mercosur (UE but not Mercosur)\n"
+            "- (UE OR Mercosur) trade (grouping)"
         )
         self.instructions.setStyleSheet(f"color: {PAL.shadow};")
         self.instructions.setWordWrap(True)
