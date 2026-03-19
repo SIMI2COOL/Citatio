@@ -180,7 +180,44 @@ def _maybe_create_desktop_shortcut() -> None:
         if sys.platform == "darwin":
             desktop_dir.mkdir(parents=True, exist_ok=True)
             app_path = desktop_dir / f"{APP_NAME}.app"
+            root_dir = Path(__file__).resolve().parent.parent
+            root_icon = root_dir / "icon.icns"
+
+            # If the launcher app already exists, make a best-effort to add the icon
+            # without overwriting the whole bundle.
             if app_path.exists():
+                try:
+                    icns_path_existing = (
+                        app_path / "Contents" / "Resources" / "Icon.icns"
+                    )
+                    if root_icon.exists():
+                        icns_path_existing.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(str(root_icon), str(icns_path_existing))
+
+                    # Ensure Info.plist tells macOS to use the icon we just placed.
+                    info_plist_path = app_path / "Contents" / "Info.plist"
+                    if root_icon.exists() and info_plist_path.exists():
+                        text = info_plist_path.read_text(encoding="utf-8")
+                        desired = "<key>CFBundleIconFile</key>\n\t\t<string>Icon</string>"
+
+                        if "CFBundleIconFile" not in text:
+                            icon_file_line = (
+                                "<key>CFBundleIconFile</key>\n"
+                                "\t\t<string>Icon</string>\n"
+                                "\t"
+                            )
+                            text = text.replace("</dict>", f"{icon_file_line}</dict>")
+                            info_plist_path.write_text(text, encoding="utf-8")
+                        elif "<string>Icon</string>" not in text:
+                            text = re.sub(
+                                r"<key>CFBundleIconFile</key>\s*<string>[^<]*</string>",
+                                desired,
+                                text,
+                                flags=re.MULTILINE,
+                            )
+                            info_plist_path.write_text(text, encoding="utf-8")
+                except Exception:
+                    pass
                 return
 
             dist_app_path = work_dir / "dist" / f"{APP_NAME}.app"
@@ -218,7 +255,13 @@ def _maybe_create_desktop_shortcut() -> None:
 
             icns_path = resources_dir / "Icon.icns"
             icon_ok = False
-            if icon_path is not None:
+            if root_icon.exists():
+                try:
+                    shutil.copy2(str(root_icon), str(icns_path))
+                    icon_ok = True
+                except Exception:
+                    icon_ok = False
+            elif icon_path is not None:
                 icon_ok = _try_make_macos_icns_from_ico(icon_path, icns_path)
 
             icon_file_line = (

@@ -8,7 +8,9 @@ python3 -m pip install -r ./requirements.txt
 python3 -m pip install pyinstaller
 
 ICON_ARG=()
-if [ -f "./dist/svgviewer-output (3) (1).ico" ]; then
+if [ -f "../icon.icns" ]; then
+  ICON_ARG=(--icon "../icon.icns")
+elif [ -f "./dist/svgviewer-output (3) (1).ico" ]; then
   ICON_ARG=(--icon "./dist/svgviewer-output (3) (1).ico")
 elif [ -f "./assets/icon.ico" ]; then
   ICON_ARG=(--icon "./assets/icon.ico")
