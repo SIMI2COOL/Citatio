@@ -1,10 +1,10 @@
 # Citatio
 
-Desktop app that ranks the most-cited papers and downloads an organized results table as CSV or XLSX.
+Citatio finds and ranks the most-cited papers on any topic using Google Scholar, and exports the results as a clean CSV or XLSX file.
 
 ## Install & run (all systems)
 
-This app runs on Windows, macOS, and Linux (as a normal Python program).
+Citatio runs on Windows, macOS, and Linux (as a normal Python program).
 If Google Scholar blocks requests, the app will show a friendly message—try fewer queries / wait a bit.
 
 Prerequisites:
@@ -129,6 +129,33 @@ From `desktop/`:
 ```
 
 The EXE will be created at `desktop/dist/Citatio.exe`.
+
+## Reopen the app later (no re-install needed)
+
+After you do the steps above once, you do not need to install the requirements again.
+
+Later, just:
+
+### Windows (PowerShell)
+
+```powershell
+cd Citatio/desktop
+py Citatio.py
+```
+
+### macOS (Terminal)
+
+```bash
+cd Citatio/desktop
+python3 Citatio.py
+```
+
+### Linux (Terminal)
+
+```bash
+cd Citatio/desktop
+python3 Citatio.py
+```
 
 ## Search tips ✨
 
