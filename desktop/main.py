@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import datetime
 import re
+import subprocess
 import sys
 import traceback
 from dataclasses import dataclass
@@ -734,8 +735,12 @@ class MainWindow(QMainWindow):
                 import os
 
                 os.startfile(str(folder))  # noqa: S606
+            elif sys.platform == "darwin":
+                # macOS
+                subprocess.run(["open", str(folder)], check=False)
             else:
-                QMessageBox.information(self, APP_NAME, f"Saved in:\n{folder}")
+                # Linux and other Unix-like
+                subprocess.run(["xdg-open", str(folder)], check=False)
         except Exception:
             QMessageBox.information(self, APP_NAME, f"Saved in:\n{folder}")
 
