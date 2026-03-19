@@ -249,27 +249,34 @@ class BevelFrame(QWidget):
     def paintEvent(self, event):  # noqa: N802
         p = QPainter(self)
         r = self.rect()
-        thickness = 3
+        thickness = 10
 
-        # i=0: bright highlight top/left
-        p.setPen(QColor(PAL.bevel_highlight))
-        i = 0
-        p.drawLine(r.left() + i, r.top() + i, r.right() - i, r.top() + i)
-        p.drawLine(r.left() + i, r.top() + i, r.left() + i, r.bottom() - i)
+        # We draw a multi-offset bevel border by repeatedly drawing 4 border lines
+        # (top/bottom/left/right) for each pixel offset from the outer edge.
+        # - Top/left: bright highlight, then inner gray
+        # - Bottom/right: dark shadow, then inner gray
+        highlight_px = 4
+        inner_px = 3  # total inner region (highlight_px..highlight_px+inner_px-1)
 
-        # i=1: mid gray inner edge (both sides)
-        p.setPen(QColor(PAL.bevel_inner))
-        i = 1
-        p.drawLine(r.left() + i, r.top() + i, r.right() - i, r.top() + i)
-        p.drawLine(r.left() + i, r.top() + i, r.left() + i, r.bottom() - i)
-        p.drawLine(r.left() + i, r.bottom() - i, r.right() - i, r.bottom() - i)
-        p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
+        for i in range(thickness):
+            top_left_pen = (
+                PAL.bevel_highlight if i < highlight_px else PAL.bevel_inner
+            )
 
-        # i=2: dark shadow bottom/right
-        p.setPen(QColor(PAL.bevel_shadow))
-        i = 2
-        p.drawLine(r.left() + i, r.bottom() - i, r.right() - i, r.bottom() - i)
-        p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
+            # Bottom/right stay dark on the outside, then become inner gray, then dark again.
+            bottom_right_pen = (
+                PAL.bevel_shadow if i < highlight_px or i >= highlight_px + inner_px else PAL.bevel_inner
+            )
+
+            # Top and left
+            p.setPen(QColor(top_left_pen))
+            p.drawLine(r.left() + i, r.top() + i, r.right() - i, r.top() + i)
+            p.drawLine(r.left() + i, r.top() + i, r.left() + i, r.bottom() - i)
+
+            # Bottom and right
+            p.setPen(QColor(bottom_right_pen))
+            p.drawLine(r.left() + i, r.bottom() - i, r.right() - i, r.bottom() - i)
+            p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
 
 
 class PlatinumTitleBar(QWidget):
@@ -378,7 +385,7 @@ class MainWindow(QMainWindow):
 
         # Frameless window frame (Mac OS-style bevel).
         # Keep this in sync with the bevel thickness drawn in paintEvent().
-        self._frame_margin = 3
+        self._frame_margin = 10
         # Wider hit area so resizing feels dynamic even while dragging quickly.
         self._resize_edge = 7
 
