@@ -58,7 +58,58 @@ def _resolve_dist_icon() -> Path | None:
 
 
 def _desktop_dir() -> Path:
-    # Most setups put Desktop under the home folder across Win/mac/Linux.
+    # On Windows, Desktop is often redirected (e.g., OneDrive).
+    if sys.platform.startswith("win"):
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            path_ptr = ctypes.c_wchar_p()
+
+            # SHGetKnownFolderPath(REFKNOWNFOLDERID, DWORD, HANDLE, PWSTR*)
+            shell32 = ctypes.windll.shell32
+            ole32 = ctypes.windll.ole32
+
+            # Use GUID struct to avoid extra dependencies.
+            class GUID(ctypes.Structure):
+                _fields_ = [
+                    ("Data1", wintypes.DWORD),
+                    ("Data2", wintypes.WORD),
+                    ("Data3", wintypes.WORD),
+                    ("Data4", ctypes.c_ubyte * 8),
+                ]
+
+            desktop_guid = GUID(
+                0xB4BFCC3A,
+                0xDB2C,
+                0x424C,
+                (ctypes.c_ubyte * 8)(0xB0, 0x29, 0x7F, 0xE9, 0x9A, 0x87, 0xC6, 0x41),
+            )
+
+            result = shell32.SHGetKnownFolderPath(
+                ctypes.byref(desktop_guid), 0, None, ctypes.byref(path_ptr)
+            )
+            if result == 0 and path_ptr.value:
+                desktop = Path(path_ptr.value)
+                ole32.CoTaskMemFree(path_ptr)
+                return desktop
+        except Exception:
+            pass
+
+        # Fallbacks for redirected desktops.
+        env_candidates = [
+            os.environ.get("OneDrive"),
+            os.environ.get("OneDriveConsumer"),
+            os.environ.get("OneDriveCommercial"),
+            os.environ.get("USERPROFILE"),
+        ]
+        for base in env_candidates:
+            if not base:
+                continue
+            candidate = Path(base) / "Desktop"
+            if candidate.exists():
+                return candidate
+
     return Path.home() / "Desktop"
 
 
