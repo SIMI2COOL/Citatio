@@ -98,8 +98,9 @@ git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
 cd Citatio/desktop
 py -m pip install -r requirements.txt
+py -m Citatio
 ```
-Then start the app from this folder.
+
 
 ## macOS (Terminal)
 
@@ -108,8 +109,8 @@ git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
 cd Citatio/desktop
 python3 -m pip install -r requirements.txt
+python3 -m Citatio
 ```
-Then start the app from this folder.
 
 ## Linux (Terminal)
 
@@ -118,8 +119,8 @@ git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
 cd Citatio/desktop
 python3 -m pip install -r requirements.txt
+python3 -m Citatio
 ```
-Then start the app from this folder.
 
 ## Reopen the app later
 
