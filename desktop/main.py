@@ -338,7 +338,8 @@ class MainWindow(QMainWindow):
             self.setWindowIcon(QIcon(str(icon_path)))
 
         # Frameless window frame (Mac OS-style bevel).
-        self._frame_margin = 6
+        # Keep this in sync with the bevel thickness drawn in paintEvent().
+        self._frame_margin = 3
         # Wider hit area so resizing feels dynamic even while dragging quickly.
         self._resize_edge = 7
 
@@ -651,25 +652,30 @@ class MainWindow(QMainWindow):
     def paintEvent(self, event):  # noqa: N802
         super().paintEvent(event)
 
-        # Old Mac OS-style multi-layer bevel border.
+        # Old Mac OS-style 3px double-bevel border.
         p = QPainter(self)
         r = self.rect()
-        thickness = max(2, self._frame_margin)
+        thickness = 3
 
-        light_steps = ["#FFFFFF", "#E9E9E9", "#D2D2D2", "#BDBDBD", "#A9A9A9", "#9A9A9A"]
-        dark_steps = ["#7A7A7A", "#676767", "#515151", "#3F3F3F", "#2F2F2F", "#222222"]
+        # i=0: bright highlight top/left
+        p.setPen(QColor(PAL.bevel_highlight))
+        i = 0
+        p.drawLine(r.left() + i, r.top() + i, r.right() - i, r.top() + i)
+        p.drawLine(r.left() + i, r.top() + i, r.left() + i, r.bottom() - i)
 
-        for i in range(thickness):
-            lc = QColor(light_steps[min(i, len(light_steps) - 1)])
-            dc = QColor(dark_steps[min(i, len(dark_steps) - 1)])
+        # i=1: mid gray inner edge (both sides)
+        p.setPen(QColor(PAL.bevel_inner))
+        i = 1
+        p.drawLine(r.left() + i, r.top() + i, r.right() - i, r.top() + i)
+        p.drawLine(r.left() + i, r.top() + i, r.left() + i, r.bottom() - i)
+        p.drawLine(r.left() + i, r.bottom() - i, r.right() - i, r.bottom() - i)
+        p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
 
-            p.setPen(lc)
-            p.drawLine(r.left() + i, r.top() + i, r.right() - i, r.top() + i)
-            p.drawLine(r.left() + i, r.top() + i, r.left() + i, r.bottom() - i)
-
-            p.setPen(dc)
-            p.drawLine(r.left() + i, r.bottom() - i, r.right() - i, r.bottom() - i)
-            p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
+        # i=2: dark shadow bottom/right
+        p.setPen(QColor(PAL.bevel_shadow))
+        i = 2
+        p.drawLine(r.left() + i, r.bottom() - i, r.right() - i, r.bottom() - i)
+        p.drawLine(r.right() - i, r.top() + i, r.right() - i, r.bottom() - i)
 
     def _refresh_save_path(self) -> None:
         keyword = (self.keyword.text() or "").strip()

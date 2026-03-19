@@ -19,6 +19,11 @@ class Palette:
     edge: str = "#909090"
     shadow: str = "#606060"
 
+    # Outer app window bevel (Mac OS-style)
+    bevel_highlight: str = "#FFFFFF"  # bright top/left
+    bevel_inner: str = "#808080"  # mid gray inner edge
+    bevel_shadow: str = "#404040"  # dark bottom/right
+
     text: str = "#1A1A1A"
 
 
