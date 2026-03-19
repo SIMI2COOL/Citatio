@@ -8,7 +8,9 @@ Citatio runs on Windows, macOS, and Linux (as a normal Python program).
 If Google Scholar blocks requests, the app will show a friendly message—try fewer queries / wait a bit.
 
 Prerequisites:
-Python 3.10+, Git, and internet access.
+- Python 3.10+
+- Git
+- Internet access
 
 ## Install Git (easy, if you don't have it)
 
@@ -96,8 +98,8 @@ git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
 cd Citatio/desktop
 py -m pip install -r requirements.txt
-py Citatio.py
 ```
+Then start the app from this folder.
 
 ## macOS (Terminal)
 
@@ -106,8 +108,8 @@ git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
 cd Citatio/desktop
 python3 -m pip install -r requirements.txt
-python3 Citatio.py
 ```
+Then start the app from this folder.
 
 ## Linux (Terminal)
 
@@ -116,84 +118,13 @@ git --version
 git clone https://github.com/SIMI2COOL/Citatio.git
 cd Citatio/desktop
 python3 -m pip install -r requirements.txt
-python3 Citatio.py
 ```
+Then start the app from this folder.
 
-## Build App Files (optional)
+## Reopen the app later
 
-If you want a “double-click / run directly” app instead of `Citatio.py`, you can build packaged versions with PyInstaller.
-
-From `desktop/`:
-
-### Windows
-```powershell
-.\build_windows.ps1
-```
-Output: `desktop/dist/Citatio.exe`
-
-### macOS
-```bash
-chmod +x ./build_macos.sh
-./build_macos.sh
-```
-Output: `desktop/dist/Citatio.app`
-
-### Linux
-```bash
-chmod +x ./build_linux.sh
-./build_linux.sh
-```
-Output: `desktop/dist/Citatio`
-
-## Run the packaged app (adds Desktop shortcut)
-
-From `desktop/`:
-
-### Windows
-```powershell
-.\run_packaged_and_install.bat
-```
-
-### macOS
-```bash
-chmod +x ./run_packaged_and_install.sh
-./run_packaged_and_install.sh
-```
-
-### Linux
-```bash
-chmod +x ./run_packaged_and_install.sh
-./run_packaged_and_install.sh
-```
-
-This opens the built app/exe from `desktop/dist/` and creates a Desktop shortcut for the current user (if needed).
-
-## Reopen the app later (no re-install needed)
-
-After you do the steps above once, you do not need to install the requirements again.
-
-Later you can either use the Desktop shortcut, or run the packaged command again:
-
-### Windows (PowerShell)
-
-```powershell
-cd Citatio/desktop
-.\run_packaged_and_install.bat
-```
-
-### macOS (Terminal)
-
-```bash
-cd Citatio/desktop
-./run_packaged_and_install.sh
-```
-
-### Linux (Terminal)
-
-```bash
-cd Citatio/desktop
-./run_packaged_and_install.sh
-```
+After the app is built, it is saved in `Citatio/desktop/dist/`.
+You can add it to your Desktop with the icon, so you can just double click it to open.
 
 ## Search tips ✨
 
