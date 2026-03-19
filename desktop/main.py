@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSpinBox,
     QTableView,
-    QSizeGrip,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
     QProgressBar,
@@ -349,11 +349,6 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(outer)
 
-        # Manual resize handle for a frameless window.
-        self._size_grip = QSizeGrip(self)
-        self._size_grip.setFixedSize(self._size_grip.sizeHint())
-        self._size_grip.raise_()
-
         self._resizing = False
         self._resize_edges = 0
         self._resize_start_pos = None
@@ -381,6 +376,7 @@ class MainWindow(QMainWindow):
 
         self.exact_label = QLabel("Exact phrase (filters by title)")
         self.exact_label.setStyleSheet("font-weight: 600;")
+        self.exact_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         self.exact = QCheckBox("")  # box is rendered to the right of the label
         self.exact.setToolTip("Filters results by whether the phrase appears in the title.")
@@ -393,14 +389,6 @@ class MainWindow(QMainWindow):
               border: 2px solid #000000;
               background-color: transparent;
               border-radius: 2px;
-            }
-            QCheckBox::indicator:unchecked {
-              border: 2px solid #000000;
-              background-color: transparent;
-            }
-            QCheckBox::indicator:checked {
-              border: 2px solid #000000;
-              background-color: transparent;
             }
             """
         )
@@ -596,13 +584,7 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
-        if hasattr(self, "_size_grip") and self._size_grip:
-            # Anchor to the bottom-right corner in the main window frame.
-            self._size_grip.move(
-                self.width() - self._size_grip.width(),
-                self.height() - self._size_grip.height(),
-            )
-            self._size_grip.raise_()
+        # No manual grip: resizing is edge-only for the frameless window.
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:  # type: ignore[override]
         # Frameless resizing: detect clicks near window edges and resize accordingly.
@@ -634,7 +616,7 @@ class MainWindow(QMainWindow):
                 self.unsetCursor()
             return False
 
-        EDGE = 8
+        EDGE = 6
         left = lp.x() <= EDGE
         right = lp.x() >= self.width() - EDGE
         top = lp.y() <= EDGE
@@ -716,6 +698,15 @@ class MainWindow(QMainWindow):
             if btn != Qt.LeftButton:
                 return False
 
+            # If the user clicked a real control, don't start resizing.
+            # This keeps the "Exact phrase" checkbox reliably clickable.
+            clicked = self.childAt(lp)
+            if clicked is not None and isinstance(
+                clicked,
+                (QCheckBox, QComboBox, QLineEdit, QSpinBox, QPushButton, QTableView),
+            ):
+                return False
+
             # Anchor to the initial edges where the press happened.
             self._resizing = True
             self._resize_edges = edges
@@ -740,6 +731,11 @@ class MainWindow(QMainWindow):
         self.addAction(act)
 
     def paintEvent(self, event):  # noqa: N802
+        # When full-screen, let the OS draw clean edges.
+        if self.isFullScreen():
+            super().paintEvent(event)
+            return
+
         # Chunky 3px beveled border: light top-left, dark bottom-right.
         p = QPainter(self)
         r = self.rect()
