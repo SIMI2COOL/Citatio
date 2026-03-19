@@ -86,6 +86,9 @@ def qss() -> str:
       selection-color: #000000;
       alternate-background-color: {p.surface};
     }}
+    QTableView::item:selected {{
+      color: #000000;
+    }}
     QHeaderView::section {{
       background: {p.chrome};
       border: 1px solid {p.shadow};

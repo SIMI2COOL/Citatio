@@ -8,11 +8,12 @@ py -m pip install pyinstaller
 py -m PyInstaller `
   --noconfirm `
   --clean `
-  --name "CiteRank" `
+  --name "Citatio" `
   --onefile `
   --windowed `
+  --icon ".\\assets\\icon.ico" `
   .\main.py
 
 Write-Host ""
-Write-Host "Built: $PSScriptRoot\dist\CiteRank.exe"
+Write-Host "Built: $PSScriptRoot\dist\Citatio.exe"
 

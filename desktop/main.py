@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt, QThread, QTimer, Signal, QUrl
-from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QKeySequence, QPainter, QPen
+from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QIcon, QKeySequence, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
 from theme import PAL, qss
 
 
-APP_NAME = "CiteRank (Desktop)"
+APP_NAME = "Citatio"
 
 
 def _sanitize_filename(s: str) -> str:
@@ -99,7 +99,7 @@ class ResultsModel(QAbstractTableModel):
                 s = "" if v is None else str(v)
                 if s.startswith("http://") or s.startswith("https://"):
                     if role == Qt.ForegroundRole:
-                        return QColor(PAL.blue)
+                        return QColor(PAL.purple)
                     f = QFont()
                     f.setUnderline(True)
                     return f
@@ -192,7 +192,7 @@ def _export_results(headers: List[str], rows: List[List[Any]], fmt: str, out_pat
 class RainbowHeader(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.setFixedHeight(34)
+        self.setFixedHeight(52)
         self._tick = 0
         self._timer = QTimer(self)
         self._timer.setInterval(120)  # 8-bit-ish pacing
@@ -319,6 +319,10 @@ class MainWindow(QMainWindow):
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
 
+        icon_path = Path(__file__).resolve().parent / "assets" / "icon.ico"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
+
         outer = QWidget()
         outer_layout = QVBoxLayout(outer)
         outer_layout.setContentsMargins(0, 0, 0, 0)
@@ -342,8 +346,13 @@ class MainWindow(QMainWindow):
 
         form = QWidget()
         grid = QGridLayout(form)
-        grid.setHorizontalSpacing(10)
+        grid.setHorizontalSpacing(6)
         grid.setVerticalSpacing(8)
+        grid.setColumnMinimumWidth(0, 90)
+        grid.setColumnStretch(0, 0)
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(2, 0)
+        grid.setColumnStretch(3, 1)
 
         self.keyword = QLineEdit()
         self.keyword.setPlaceholderText("e.g. diffusion models medical imaging")
@@ -358,8 +367,9 @@ class MainWindow(QMainWindow):
         self.nresults.setSingleStep(5)
         self.nresults.setValue(25)
 
-        self.extra_delay = QCheckBox("Extra delay (safer)")
+        self.extra_delay = QCheckBox("")
         self.extra_delay.setChecked(True)
+        self.extra_delay.setToolTip("Extra delay between page requests (reduces blocks).")
 
         this_year = datetime.datetime.now().year
         self.start_year = QSpinBox()
@@ -460,7 +470,7 @@ class MainWindow(QMainWindow):
             "- OR: (diffusion OR denoising)\n"
             "- Exclude: diffusion -survey\n"
             "- Grouping: (diffusion OR denoising) medical\n"
-            "Tip: turn on “Extra delay (safer)” + fewer results to avoid blocks."
+            "Tip: turn on “Extra delay” + fewer results to avoid blocks."
         )
         self.instructions.setStyleSheet(f"color: {PAL.shadow};")
         self.instructions.setWordWrap(True)
@@ -475,9 +485,8 @@ class MainWindow(QMainWindow):
         grid.addWidget(QLabel("Results (max 100)"), row, 2)
         grid.addWidget(self.nresults, row, 3)
         row += 1
-
-        grid.addWidget(self.extra_delay, row, 1, 1, 3)
-        row += 1
+        # Keep the feature, but remove the visible "Extra delay (safer)" text line.
+        grid.addWidget(self.extra_delay, row - 1, 3, alignment=Qt.AlignRight | Qt.AlignVCenter)
 
         grid.addWidget(QLabel("Year from"), row, 0)
         grid.addWidget(self.start_year, row, 1)
