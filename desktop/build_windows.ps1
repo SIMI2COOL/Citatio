@@ -11,7 +11,6 @@ py -m PyInstaller `
   --name "Citatio" `
   --onefile `
   --windowed `
-  --icon ".\\assets\\icon.ico" `
   .\main.py
 
 Write-Host ""
