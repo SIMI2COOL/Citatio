@@ -97,20 +97,25 @@ def _ps_quote(s: str) -> str:
     return "'" + s.replace("'", "''") + "'"
 
 
-def _install_windows_shortcut(icon_path: Optional[Path], target_exe: Path) -> None:
+def _install_windows_shortcut(
+    icon_path: Optional[Path],
+    target_path: Path,
+    arguments: str = "",
+    working_directory: Optional[Path] = None,
+) -> None:
     desktop = _desktop_dir()
     desktop.mkdir(parents=True, exist_ok=True)
 
     link_path = desktop / f"{APP_NAME}.lnk"
 
-    work_dir = str(target_exe.parent)
-    target_path = str(target_exe)
+    work_dir = str(working_directory or target_path.parent)
+    target_path_str = str(target_path)
 
     ps_cmd = (
         "$WshShell = New-Object -ComObject WScript.Shell; "
         f"$Shortcut = $WshShell.CreateShortcut({_ps_quote(str(link_path))}); "
-        f"$Shortcut.TargetPath = {_ps_quote(target_path)}; "
-        f"$Shortcut.Arguments = ''; "
+        f"$Shortcut.TargetPath = {_ps_quote(target_path_str)}; "
+        f"$Shortcut.Arguments = {_ps_quote(arguments)}; "
         f"$Shortcut.WorkingDirectory = {_ps_quote(work_dir)}; "
     )
     if icon_path is not None:
@@ -179,6 +184,39 @@ def main() -> int:
     icon_path = _resolve_icon()
     platform_tag, target = _resolve_target()
 
+    if platform_tag == "win" and target is None:
+        # Fallback for fresh clones before EXE build:
+        # still create a Desktop shortcut that runs the Python app.
+        script = _base_dir() / "Citatio.py"
+        if not script.exists():
+            print(
+                f"Could not find built app or script for this system.\n"
+                f"Expected `{APP_NAME}.exe` in `desktop/dist/` or `desktop/Citatio.py`."
+            )
+            return 1
+
+        _install_windows_shortcut(
+            icon_path=icon_path,
+            target_path=Path(sys.executable),
+            arguments=str(script),
+            working_directory=_base_dir(),
+        )
+        try:
+            subprocess.Popen(
+                [sys.executable, str(script)],
+                cwd=str(_base_dir()),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            print(
+                "Launched Python app and added Desktop shortcut "
+                "(EXE not found yet; build later if needed)."
+            )
+            return 0
+        except Exception as e:
+            print(f"Shortcut created, but couldn't launch Python app: {e}")
+            return 2
+
     if target is None:
         print(
             f"Could not find the built app in `desktop/dist` for this system.\n"
@@ -189,7 +227,7 @@ def main() -> int:
 
     # 1) Add a Desktop shortcut (create-only).
     if platform_tag == "win":
-        _install_windows_shortcut(icon_path, target)
+        _install_windows_shortcut(icon_path=icon_path, target_path=target)
     elif platform_tag == "mac":
         _install_macos_desktop_app_symlink(target)
     else:
