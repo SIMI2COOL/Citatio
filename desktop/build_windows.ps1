@@ -6,7 +6,10 @@ py -m pip install -r .\requirements.txt
 py -m pip install pyinstaller
 
 $iconArg = @()
-if (Test-Path ".\\assets\\icon.ico") {
+if (Test-Path ".\\dist\\svgviewer-output (3) (1).ico") {
+  $iconArg = @("--icon", ".\\dist\\svgviewer-output (3) (1).ico")
+}
+elseif (Test-Path ".\\assets\\icon.ico") {
   $iconArg = @("--icon", ".\\assets\\icon.ico")
 }
 

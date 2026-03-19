@@ -1,45 +1,50 @@
 # Que-Dice Google Scholar — Desktop App
 
-This project is now **desktop-only** (the web app has been removed).
+Desktop-only app to search Google Scholar and export results. If Scholar blocks requests, just try fewer queries / wait a bit (the app shows friendly errors).
 
-## Easiest way (for your girlfriend)
+## Quick start (Windows) 🪟
 
-1. Download/copy the file:
-   - `desktop\dist\CiteRank.exe`
-2. Double-click it to open.
+If you already have a built EXE:
+1. Go to `desktop/dist/`
+2. Double-click `Citatio.exe`
 
 If Windows shows a warning:
-- Click **More info** → **Run anyway**
+- Click **More info** → **Run anyway** ✅
 
-## Run the desktop app (developer)
+## Run from source (Windows/macOS/Linux) 🐍
 
-Open PowerShell in the `desktop` folder and run:
+1. Install Python 3+
+2. Open a terminal in the `desktop/` folder
+3. Run:
 
 ```powershell
 py -m pip install -r requirements.txt
 py main.py
 ```
 
-## Build a Windows EXE
+## Build a Windows EXE (developer) 🧰
 
-From the `desktop` folder:
+From the `desktop/` folder:
 
 ```powershell
 .\build_windows.ps1
 ```
 
-The EXE will be created at `desktop\dist\CiteRank.exe`.
+The EXE is created at `desktop/dist/Citatio.exe`.
 
-## How saving works
+## Saving 💾
 
 - Results are automatically saved into your **Downloads** folder
-- The filename is the **keyword you searched**, like:
+- The filename is based on your keyword, e.g.:
   - `deep learning for radiology.csv`
-  - `diffusion models xlsx.xlsx`
+  - `ue-mercosur xlsx.xlsx`
 
-## Search tips (inside the app)
+## Search tips ✨
 
-Click **Search tips** in the app to see examples like:
-- Quotes for exact phrases
-- OR / minus-exclude / parentheses grouping
+Inside the app, you can use the examples to do:
+- General searches
+- Exact phrase searches (title filtering)
+- Excluding terms
+- Author / publication filters
+- Boolean queries
 

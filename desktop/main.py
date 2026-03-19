@@ -9,12 +9,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt, QThread, QTimer, Signal, QUrl
+from PySide6.QtCore import QAbstractTableModel, QEvent, QModelIndex, QObject, Qt, QThread, QTimer, Signal, QUrl
 from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QIcon, QKeySequence, QPainter, QPen
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QAbstractSpinBox,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -24,6 +25,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSpinBox,
     QTableView,
+    QSizeGrip,
     QVBoxLayout,
     QWidget,
     QProgressBar,
@@ -306,6 +308,10 @@ class PlatinumTitleBar(QWidget):
 
         # Title text (avoid button cluster)
         p.setPen(QColor(PAL.shadow))
+        title_font = QFont()
+        title_font.setPointSize(14)
+        title_font.setBold(True)
+        p.setFont(title_font)
         left_pad = 10
         right_limit = yellow[0] - 10
         p.drawText(left_pad, 0, max(0, right_limit - left_pad), self.height(), Qt.AlignVCenter | Qt.AlignLeft, APP_NAME)
@@ -319,7 +325,10 @@ class MainWindow(QMainWindow):
 
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
 
-        icon_path = Path(__file__).resolve().parent / "assets" / "icon.ico"
+        # Prefer the explicitly provided icon from your dist folder.
+        icon_path = Path(__file__).resolve().parent / "dist" / "svgviewer-output (3) (1).ico"
+        if not icon_path.exists():
+            icon_path = Path(__file__).resolve().parent / "assets" / "icon.ico"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
 
@@ -340,6 +349,19 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(outer)
 
+        # Manual resize handle for a frameless window.
+        self._size_grip = QSizeGrip(self)
+        self._size_grip.setFixedSize(self._size_grip.sizeHint())
+        self._size_grip.raise_()
+
+        self._resizing = False
+        self._resize_edges = 0
+        self._resize_start_pos = None
+        self._resize_start_geom = None
+
+        # Edge-resize for frameless windows: native resizing doesn't work reliably.
+        QApplication.instance().installEventFilter(self)
+
         root = QVBoxLayout(content)
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(10)
@@ -355,9 +377,41 @@ class MainWindow(QMainWindow):
         grid.setColumnStretch(3, 1)
 
         self.keyword = QLineEdit()
-        self.keyword.setPlaceholderText("e.g. \"UE-Mercosur\" OR \"diffusion models\"")
-        self.exact = QCheckBox("Exact phrase (filters by title)")
-        self.exact.setStyleSheet("font-weight: 600;")
+        self.keyword.setPlaceholderText("e.g. \"UE-Mercosur\" OR \"Transformer Models\"")
+
+        self.exact_label = QLabel("Exact phrase (filters by title)")
+        self.exact_label.setStyleSheet("font-weight: 600;")
+
+        self.exact = QCheckBox("")  # box is rendered to the right of the label
+        self.exact.setToolTip("Filters results by whether the phrase appears in the title.")
+        self.exact.setFixedSize(22, 22)
+        self.exact.setStyleSheet(
+            """
+            QCheckBox::indicator {
+              width: 16px;
+              height: 16px;
+              border: 2px solid #000000;
+              background-color: transparent;
+              border-radius: 2px;
+            }
+            QCheckBox::indicator:unchecked {
+              border: 2px solid #000000;
+              background-color: transparent;
+            }
+            QCheckBox::indicator:checked {
+              border: 2px solid #000000;
+              background-color: transparent;
+            }
+            """
+        )
+
+        exact_row = QWidget()
+        exact_layout = QHBoxLayout(exact_row)
+        exact_layout.setContentsMargins(0, 0, 0, 0)
+        exact_layout.setSpacing(6)
+        exact_layout.addWidget(self.exact_label, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        # Keep the square immediately next to the label (not pushed to the far right).
+        exact_layout.addWidget(self.exact, 0, Qt.AlignLeft | Qt.AlignVCenter)
         self.keyword.textChanged.connect(self._refresh_save_path)
 
         self.sortby = QComboBox()
@@ -367,10 +421,8 @@ class MainWindow(QMainWindow):
         self.nresults.setRange(10, 100)
         self.nresults.setSingleStep(5)
         self.nresults.setValue(25)
-
-        self.extra_delay = QCheckBox("")
-        self.extra_delay.setChecked(True)
-        self.extra_delay.setToolTip("Extra delay between page requests (reduces blocks).")
+        self.nresults.setButtonSymbols(QAbstractSpinBox.UpDownArrows)
+        self.nresults.setFixedWidth(90)  # ensure both arrows remain visible
 
         this_year = datetime.datetime.now().year
         self.start_year = QSpinBox()
@@ -467,23 +519,22 @@ class MainWindow(QMainWindow):
         grid.addWidget(self.keyword, row, 1, 1, 3)
         row += 1
 
-        grid.addWidget(self.exact, row, 1, 1, 3)
+        # Exact phrase option must sit between the keyword bar and the examples.
+        grid.addWidget(exact_row, row, 1, 1, 3)
         row += 1
 
         self.instructions = QLabel(
             "Examples:\n"
-            "- \"UE-Mercosur\" (exact phrase)\n"
-            "- UE Mercosur agriculture (both words)\n"
-            "- UE OR Mercosur (either term)\n"
-            "- UE -Mercosur (UE but not Mercosur)\n"
-            "- (UE OR Mercosur) trade (grouping)"
+            "- UE-Mercosur → General search\n"
+            '- "UE-Mercosur" → Exact phrase search\n'
+            "- UE-Mercosur -transformer → Exclude specific term\n"
+            '- UE-Mercosur author:"Geoffrey Hinton" → Search by author\n'
+            "- UE-Mercosur source:Nature → Search within a specific publication\n"
+            '- ("UE-Mercosur" OR "Transformer Models") AND (GPT OR BERT) → Boolean search'
         )
         self.instructions.setStyleSheet(f"color: {PAL.shadow};")
         self.instructions.setWordWrap(True)
         grid.addWidget(self.instructions, row, 1, 1, 3)
-        row += 1
-
-        grid.addWidget(self.exact, row, 1, 1, 3)
         row += 1
 
         grid.addWidget(QLabel("Sort by"), row, 0)
@@ -491,8 +542,6 @@ class MainWindow(QMainWindow):
         grid.addWidget(QLabel("Results (max 100)"), row, 2)
         grid.addWidget(self.nresults, row, 3)
         row += 1
-        # Keep the feature, but remove the visible "Extra delay (safer)" text line.
-        grid.addWidget(self.extra_delay, row - 1, 3, alignment=Qt.AlignRight | Qt.AlignVCenter)
 
         grid.addWidget(QLabel("Year from"), row, 0)
         grid.addWidget(self.start_year, row, 1)
@@ -523,7 +572,7 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.open_btn)
         buttons.addStretch(1)
 
-        self.status = QLabel("Ready.")
+        self.status = QLabel("")  # remove the initial "Ready." text
         buttons.addWidget(self.status)
         root.addLayout(buttons)
 
@@ -544,6 +593,145 @@ class MainWindow(QMainWindow):
         self._last_saved: Optional[Path] = None
         self._install_shortcuts()
         self._refresh_save_path()
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        if hasattr(self, "_size_grip") and self._size_grip:
+            # Anchor to the bottom-right corner in the main window frame.
+            self._size_grip.move(
+                self.width() - self._size_grip.width(),
+                self.height() - self._size_grip.height(),
+            )
+            self._size_grip.raise_()
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:  # type: ignore[override]
+        # Frameless resizing: detect clicks near window edges and resize accordingly.
+        # (We ignore title bar events so dragging the window still works normally.)
+        if event is None:
+            return False
+        if self.isMaximized():
+            return False
+
+        # Only handle events relevant to resizing.
+        if event.type() not in (QEvent.MouseMove, QEvent.MouseButtonPress, QEvent.MouseButtonRelease):
+            return False
+
+        # Avoid interfering with the custom title bar drag.
+        if event.type() == QEvent.MouseButtonPress and obj == self.titlebar:
+            return False
+
+        # local position of cursor within the window
+        try:
+            gp = event.globalPosition().toPoint()  # type: ignore[attr-defined]
+        except Exception:
+            return False
+
+        lp = self.mapFromGlobal(gp)
+
+        # Ignore if cursor is outside the window rect.
+        if not self.rect().contains(lp):
+            if not self._resizing:
+                self.unsetCursor()
+            return False
+
+        EDGE = 8
+        left = lp.x() <= EDGE
+        right = lp.x() >= self.width() - EDGE
+        top = lp.y() <= EDGE
+        bottom = lp.y() >= self.height() - EDGE
+
+        edges = 0
+        if left:
+            edges |= 1
+        if right:
+            edges |= 2
+        if top:
+            edges |= 4
+        if bottom:
+            edges |= 8
+
+        if event.type() == QEvent.MouseMove:
+            if self._resizing:
+                if self._resize_start_pos is None or self._resize_start_geom is None:
+                    return True
+                dx = gp.x() - self._resize_start_pos.x()
+                dy = gp.y() - self._resize_start_pos.y()
+                g = self._resize_start_geom
+                active_edges = self._resize_edges
+                min_w = max(self.minimumWidth(), 200)
+                min_h = max(self.minimumHeight(), 200)
+
+                new_x = g.x()
+                new_y = g.y()
+                new_w = g.width()
+                new_h = g.height()
+
+                if active_edges & 1:  # left
+                    new_x = g.x() + dx
+                    new_w = g.width() - dx
+                if active_edges & 2:  # right
+                    new_w = g.width() + dx
+                if active_edges & 4:  # top
+                    new_y = g.y() + dy
+                    new_h = g.height() - dy
+                if active_edges & 8:  # bottom
+                    new_h = g.height() + dy
+
+                # Enforce minimum size (and keep the "pinned" edge stable).
+                if new_w < min_w:
+                    if active_edges & 1:
+                        new_x = g.right() - (min_w - 1)
+                    new_w = min_w
+                if new_h < min_h:
+                    if active_edges & 4:
+                        new_y = g.bottom() - (min_h - 1)
+                    new_h = min_h
+
+                self.setGeometry(new_x, new_y, new_w, new_h)
+                return True
+
+            # Not resizing: update cursor if hovering over an edge.
+            if edges == 0:
+                self.unsetCursor()
+                return False
+
+            if (edges & 1 and edges & 4) or (edges & 2 and edges & 8):
+                self.setCursor(Qt.SizeFDiagCursor)
+            elif (edges & 2 and edges & 4) or (edges & 1 and edges & 8):
+                self.setCursor(Qt.SizeBDiagCursor)
+            elif edges & (1 | 2):
+                self.setCursor(Qt.SizeHorCursor)
+            elif edges & (4 | 8):
+                self.setCursor(Qt.SizeVerCursor)
+            return False
+
+        if event.type() == QEvent.MouseButtonPress:
+            # Start resizing only when the click is near an edge.
+            if edges == 0:
+                return False
+            try:
+                btn = event.button()  # type: ignore[attr-defined]
+            except Exception:
+                return False
+            if btn != Qt.LeftButton:
+                return False
+
+            # Anchor to the initial edges where the press happened.
+            self._resizing = True
+            self._resize_edges = edges
+            self._resize_start_pos = gp
+            self._resize_start_geom = self.geometry()
+            return True
+
+        if event.type() == QEvent.MouseButtonRelease:
+            if self._resizing:
+                self._resizing = False
+                self._resize_edges = 0
+                self._resize_start_pos = None
+                self._resize_start_geom = None
+                return True
+
+        return False
 
     def _install_shortcuts(self) -> None:
         act = QAction(self)
@@ -622,7 +810,8 @@ class MainWindow(QMainWindow):
             start_year=start_year,
             end_year=end_year,
             langfilter=self._lang_map.get(self.lang.currentText(), "All"),
-            extra_delay=self.extra_delay.isChecked(),
+            # Removed the UI "tick option", keep the safer default delay behavior.
+            extra_delay=True,
             out_format=self.format.currentText(),
             out_path=out_path,
         )
