@@ -172,27 +172,27 @@ This opens the built app/exe from `desktop/dist/` and creates a Desktop shortcut
 
 After you do the steps above once, you do not need to install the requirements again.
 
-Later, just:
+Later you can either use the Desktop shortcut, or run the packaged command again:
 
 ### Windows (PowerShell)
 
 ```powershell
 cd Citatio/desktop
-py Citatio.py
+.\run_packaged_and_install.bat
 ```
 
 ### macOS (Terminal)
 
 ```bash
 cd Citatio/desktop
-python3 Citatio.py
+./run_packaged_and_install.sh
 ```
 
 ### Linux (Terminal)
 
 ```bash
 cd Citatio/desktop
-python3 Citatio.py
+./run_packaged_and_install.sh
 ```
 
 ## Search tips ✨
