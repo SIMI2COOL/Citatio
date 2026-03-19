@@ -195,8 +195,6 @@ def _maybe_create_desktop_shortcut() -> None:
         if sys.platform.startswith("win"):
             desktop_dir.mkdir(parents=True, exist_ok=True)
             link_path = desktop_dir / f"{APP_NAME}.lnk"
-            if link_path.exists():
-                return
 
             exe_path = work_dir / "dist" / f"{APP_NAME}.exe"
             if exe_path.exists():
@@ -218,7 +216,7 @@ def _maybe_create_desktop_shortcut() -> None:
                 f"$Shortcut.WorkingDirectory = {_ps_quote(working_directory)}; "
             )
             if icon_path is not None:
-                ps_cmd += f"$Shortcut.IconLocation = {_ps_quote(str(icon_path))}; "
+                ps_cmd += f"$Shortcut.IconLocation = {_ps_quote(f'{str(icon_path)},0')}; "
             ps_cmd += "$Shortcut.Save();"
 
             subprocess.run(

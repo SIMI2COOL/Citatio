@@ -102,8 +102,6 @@ def _install_windows_shortcut(icon_path: Optional[Path], target_exe: Path) -> No
     desktop.mkdir(parents=True, exist_ok=True)
 
     link_path = desktop / f"{APP_NAME}.lnk"
-    if link_path.exists():
-        return
 
     work_dir = str(target_exe.parent)
     target_path = str(target_exe)
@@ -116,7 +114,7 @@ def _install_windows_shortcut(icon_path: Optional[Path], target_exe: Path) -> No
         f"$Shortcut.WorkingDirectory = {_ps_quote(work_dir)}; "
     )
     if icon_path is not None:
-        ps_cmd += f"$Shortcut.IconLocation = {_ps_quote(str(icon_path))}; "
+        ps_cmd += f"$Shortcut.IconLocation = {_ps_quote(f'{str(icon_path)},0')}; "
     ps_cmd += "$Shortcut.Save();"
 
     subprocess.run(
