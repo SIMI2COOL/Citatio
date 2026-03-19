@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import datetime
 import os
+import plistlib
 import re
 import subprocess
 import tempfile
@@ -188,35 +189,23 @@ def _maybe_create_desktop_shortcut() -> None:
             # without overwriting the whole bundle.
             if app_path.exists():
                 try:
-                    icns_path_existing = (
-                        app_path / "Contents" / "Resources" / "Icon.icns"
-                    )
+                    # Copy icon file into the existing bundle.
+                    icns_path_existing = app_path / "Contents" / "Resources" / "Icon.icns"
                     if root_icon.exists():
                         icns_path_existing.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(str(root_icon), str(icns_path_existing))
 
                     # Ensure Info.plist tells macOS to use the icon we just placed.
                     info_plist_path = app_path / "Contents" / "Info.plist"
-                    if root_icon.exists() and info_plist_path.exists():
-                        text = info_plist_path.read_text(encoding="utf-8")
-                        desired = "<key>CFBundleIconFile</key>\n\t\t<string>Icon</string>"
+                    if info_plist_path.exists() and root_icon.exists():
+                        with info_plist_path.open("rb") as f:
+                            plist = plistlib.load(f)
+                        plist["CFBundleIconFile"] = "Icon"
+                        with info_plist_path.open("wb") as f:
+                            plistlib.dump(plist, f)
 
-                        if "CFBundleIconFile" not in text:
-                            icon_file_line = (
-                                "<key>CFBundleIconFile</key>\n"
-                                "\t\t<string>Icon</string>\n"
-                                "\t"
-                            )
-                            text = text.replace("</dict>", f"{icon_file_line}</dict>")
-                            info_plist_path.write_text(text, encoding="utf-8")
-                        elif "<string>Icon</string>" not in text:
-                            text = re.sub(
-                                r"<key>CFBundleIconFile</key>\s*<string>[^<]*</string>",
-                                desired,
-                                text,
-                                flags=re.MULTILINE,
-                            )
-                            info_plist_path.write_text(text, encoding="utf-8")
+                    # Finder often needs a refresh to show updated icons.
+                    subprocess.run(["touch", str(app_path)], check=False)
                 except Exception:
                     pass
                 return
@@ -291,7 +280,22 @@ def _maybe_create_desktop_shortcut() -> None:
 {icon_file_line}</dict>
 </plist>
 """
-            (contents / "Info.plist").write_text(info_plist, encoding="utf-8")
+            info_plist_path = contents / "Info.plist"
+            info_plist_path.write_text(info_plist, encoding="utf-8")
+
+            # Force CFBundleIconFile to be correct (and use plistlib to avoid formatting issues).
+            try:
+                if info_plist_path.exists():
+                    with info_plist_path.open("rb") as f:
+                        plist = plistlib.load(f)
+                    plist["CFBundleIconFile"] = "Icon"
+                    with info_plist_path.open("wb") as f:
+                        plistlib.dump(plist, f)
+            except Exception:
+                pass
+
+            # Finder icon cache refresh (best-effort).
+            subprocess.run(["touch", str(app_path)], check=False)
             return
 
         # Linux / other Unix-like.

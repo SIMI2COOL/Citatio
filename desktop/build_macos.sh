@@ -48,5 +48,10 @@ if info_plist.exists():
 PY
 fi
 
+# Finder icon refresh (best-effort). Touch the bundle so Finder re-reads metadata.
+if [ -d "$APP_BUNDLE" ]; then
+  touch "$APP_BUNDLE" 2>/dev/null || true
+fi
+
 echo "Built (macOS): $SCRIPT_DIR/dist/Citatio.app"
 
