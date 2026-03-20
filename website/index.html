@@ -3,163 +3,536 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Citatio — Descargar</title>
+  <title>CITATIO — Descargar</title>
   <meta name="description" content="Descarga Citatio para Windows." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
   <style>
-    /* Matches desktop/theme.py — LIGHT palette + rainbow strip */
+    /* --- IBM navy + horizontal stripes --- */
     :root {
-      --surface: #f0f0f0;
-      --chrome: #c0c0c0;
-      --edge: #909090;
-      --shadow: #606060;
-      --highlight: #ffffff;
-      --light-edge: #dfdfdf;
-      --dark-shadow: #404040;
-      --text: #1a1a1a;
-      --text-muted: #606060;
-      --field: #ffffff;
-      --green: #6abd45;
-      --yellow: #f5bc00;
-      --orange: #f6821f;
-      --red: #e2231a;
-      --purple: #8a2be2;
-      --blue: #009cde;
+      --ibm-navy: #0a1328;
+      --ibm-stripe-hi: #1a3a5c;
+      --ibm-stripe-lo: #0d1f38;
+      --phosphor: #ffcc33;
+      --phosphor-glow: #ffaa00;
+      --phosphor-dim: #b8860b;
+      --win-grey: #c0c0c0;
+      --win-light: #ffffff;
+      --win-dark: #404040;
+      --win-shadow: #808080;
+      --title-mid: #a0a0a0;
+      --link-blue: #0000ee;
+      --link-purple: #551a8b;
+      --taskbar: #c0c0c0;
     }
+
     * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      min-height: 100%;
+
+    /* Classic arrow cursor (SVG) */
+    html {
+      cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 32 32'%3E%3Cpath fill='%23fff' stroke='%23000' stroke-width='1.2' d='M2 2 L2 24 L10 16 L14 28 L18 26 L14 14 L24 14 Z'/%3E%3C/svg%3E") 2 2, auto;
     }
+
+    a, button, .win-btn {
+      cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 32 32'%3E%3Cpath fill='%23fff' stroke='%23000' stroke-width='1.2' d='M2 2 L2 24 L10 16 L14 28 L18 26 L14 14 L24 14 Z'/%3E%3C/svg%3E") 2 2, pointer;
+    }
+
     body {
-      font-family: "Segoe UI", Tahoma, Geneva, "Helvetica Neue", sans-serif;
-      font-size: 15px;
-      color: var(--text);
-      background: var(--surface);
-      line-height: 1.45;
+      margin: 0;
+      min-height: 100vh;
+      padding-bottom: 36px;
+      font-family: Geneva, Chicago, "Lucida Grande", Tahoma, sans-serif;
+      font-size: 18px;
+      color: #1a1a1a;
+      background-color: var(--ibm-navy);
+      background-image:
+        repeating-linear-gradient(
+          180deg,
+          var(--ibm-stripe-lo) 0px,
+          var(--ibm-stripe-lo) 2px,
+          var(--ibm-navy) 2px,
+          var(--ibm-navy) 4px,
+          var(--ibm-stripe-hi) 4px,
+          var(--ibm-stripe-hi) 5px,
+          var(--ibm-navy) 5px,
+          var(--ibm-navy) 8px
+        );
+      overflow-x: hidden;
     }
-    .rainbow {
-      height: 10px;
-      background: linear-gradient(
-        90deg,
-        var(--green) 0%,
-        var(--yellow) 20%,
-        var(--orange) 40%,
-        var(--red) 60%,
-        var(--purple) 80%,
-        var(--blue) 100%
+
+    /* Subtle film grain */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0.08;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      mix-blend-mode: overlay;
+    }
+
+    /* CRT scanlines */
+    .crt-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 100;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0) 0px,
+        rgba(0, 0, 0, 0) 2px,
+        rgba(0, 0, 0, 0.13) 2px,
+        rgba(0, 0, 0, 0.13) 3px
       );
+      mix-blend-mode: multiply;
     }
-    .wrap {
-      max-width: 440px;
+
+    /* Soft vignette + greenish CRT tint */
+    .crt-vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 99;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 20, 10, 0.25) 100%);
+      box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Mac OS classic–style rainbow bar (top) */
+    .mac-rainbow {
+      position: relative;
+      z-index: 5;
+      height: 8px;
+      display: flex;
+      width: 100%;
+    }
+    .mac-rainbow span {
+      flex: 1;
+      min-width: 0;
+    }
+    .mac-rainbow span:nth-child(1) { background: #ff0000; }
+    .mac-rainbow span:nth-child(2) { background: #ff9900; }
+    .mac-rainbow span:nth-child(3) { background: #ffff00; }
+    .mac-rainbow span:nth-child(4) { background: #33ff33; }
+    .mac-rainbow span:nth-child(5) { background: #00ccff; }
+    .mac-rainbow span:nth-child(6) { background: #6666ff; }
+    .mac-rainbow span:nth-child(7) { background: #cc66ff; }
+
+    .main-inner {
+      position: relative;
+      z-index: 5;
+      max-width: 520px;
       margin: 0 auto;
-      padding: 2rem 1.25rem 3rem;
+      padding: clamp(1rem, 4vw, 2.5rem) 1rem 1rem;
     }
-    .panel {
-      background: var(--field);
-      border: 2px solid var(--edge);
-      border-top-color: var(--shadow);
-      border-left-color: var(--shadow);
-      border-right-color: var(--highlight);
-      border-bottom-color: var(--light-edge);
-      padding: 1.25rem 1.35rem;
+
+    /* Giant title — terminal / pixel */
+    .hero-title {
+      font-family: "Press Start 2P", monospace;
+      font-size: clamp(0.65rem, 4.2vw, 1.65rem);
+      line-height: 1.5;
+      text-align: center;
+      margin: 0 0 clamp(1.2rem, 4vw, 2rem);
+      letter-spacing: 0.08em;
+      color: var(--phosphor);
+      text-shadow:
+        0 0 6px var(--phosphor-glow),
+        0 0 24px rgba(255, 170, 0, 0.45),
+        2px 2px 0 var(--phosphor-dim);
+      animation: phosphor-flicker 4.5s ease-in-out infinite;
     }
-    h1 {
+
+    @keyframes phosphor-flicker {
+      0%, 100% { opacity: 1; filter: brightness(1); }
+      48% { opacity: 1; }
+      50% { opacity: 0.92; filter: brightness(1.08); }
+      52% { opacity: 1; }
+      92% { opacity: 0.97; }
+    }
+
+    /* Win95 / Mac OS 9–style window */
+    .win-outer {
+      border: 2px solid;
+      border-color: var(--win-light) var(--win-dark) var(--win-dark) var(--win-light);
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.35);
+      background: var(--win-grey);
+    }
+
+    .title-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 4px 5px 4px 8px;
+      background: linear-gradient(180deg, #e8e8e8 0%, #b0b0b0 45%, #909090 100%);
+      border-bottom: 2px solid var(--win-dark);
+      user-select: none;
+    }
+
+    .title-text {
+      font-family: "VT323", Geneva, Chicago, monospace;
       font-size: 1.35rem;
       font-weight: 700;
-      margin: 0 0 0.35rem;
-      letter-spacing: -0.02em;
+      color: #111;
+      text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .muted {
-      color: var(--text-muted);
-      font-size: 0.92rem;
-      margin: 0 0 1.25rem;
+
+    .title-controls {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
     }
-    .btn-wrap {
-      margin-top: 0.5rem;
+
+    .title-btn {
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      font-family: "VT323", monospace;
+      font-size: 14px;
+      line-height: 1;
+      color: #000;
+      background: var(--win-grey);
+      border: 2px solid;
+      border-color: var(--win-light) var(--win-dark) var(--win-dark) var(--win-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: inherit;
     }
-    /* Raised button — same logic as QPushButton in theme.py */
-    .btn {
+
+    .title-btn:active {
+      border-color: var(--win-dark) var(--win-light) var(--win-light) var(--win-dark);
+      padding-top: 1px;
+      padding-left: 1px;
+    }
+
+    .win-body {
+      padding: 1.1rem 1.15rem 1.25rem;
+      background: var(--win-grey);
+      border: 2px solid;
+      border-color: var(--win-dark) var(--win-light) var(--win-light) var(--win-dark);
+      margin: 2px;
+    }
+
+    .media-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+
+    /* Floppy + CD stack animation */
+    .disk-stack {
+      flex-shrink: 0;
+      position: relative;
+      width: 56px;
+      height: 64px;
+    }
+
+    .floppy {
+      position: absolute;
+      left: 0;
+      top: 8px;
+      width: 52px;
+      height: 54px;
+      background: linear-gradient(180deg, #4a4a4a 0%, #2a2a2a 12%, #3a3a3a 100%);
+      border: 2px solid;
+      border-color: #666 #111 #111 #666;
+      border-radius: 2px;
+      animation: disk-bob 2.2s ease-in-out infinite;
+    }
+
+    .floppy::before {
+      content: "";
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      right: 8px;
+      height: 22px;
+      background: #1a1a1a;
+      border: 1px solid #000;
+    }
+
+    .floppy::after {
+      content: "";
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 28px;
+      height: 6px;
+      background: #c0c0c0;
+      border: 1px solid #333;
+    }
+
+    .cd {
+      position: absolute;
+      right: -4px;
+      top: 0;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background:
+        conic-gradient(
+          from 0deg,
+          #e53935, #fb8c00, #fdd835, #43a047, #1e88e5, #8e24aa, #e53935
+        );
+      border: 3px solid #222;
+      box-shadow: inset 0 0 0 6px rgba(0, 0, 0, 0.25), 2px 2px 0 rgba(0, 0, 0, 0.3);
+      animation: cd-spin 6s linear infinite;
+    }
+
+    .cd::after {
+      content: "";
+      position: absolute;
+      inset: 50%;
+      transform: translate(-50%, -50%);
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #111;
+      border: 1px solid #333;
+    }
+
+    @keyframes disk-bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+
+    @keyframes cd-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .blurb {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.4;
+      color: #222;
+    }
+
+    .version-line {
+      font-family: "VT323", monospace;
+      font-size: 1.35rem;
+      color: #333;
+      margin: 12px 0 14px;
+    }
+
+    .version-line strong {
+      color: #000080;
+    }
+
+    /* Win95 3D button */
+    .win-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       width: 100%;
-      min-height: 34px;
-      padding: 6px 14px;
-      font-family: inherit;
-      font-size: 15px;
-      font-weight: normal;
-      color: var(--text);
-      background: var(--chrome);
-      cursor: pointer;
+      min-height: 36px;
+      padding: 8px 14px;
+      font-family: Geneva, Chicago, Tahoma, sans-serif;
+      font-size: 1rem;
+      color: #000;
       text-decoration: none;
-      border-radius: 0;
-      border: 2px solid var(--shadow);
-      border-top-color: var(--highlight);
-      border-left-color: var(--highlight);
-      border-right-color: var(--dark-shadow);
-      border-bottom-color: var(--dark-shadow);
-      transition: none;
+      background: var(--win-grey);
+      border: 2px solid;
+      border-color: var(--win-light) var(--win-dark) var(--win-dark) var(--win-light);
+      box-shadow: 1px 1px 0 #000;
     }
-    .btn:hover {
-      filter: brightness(1.03);
+
+    .win-btn:hover {
+      filter: brightness(1.04);
     }
-    .btn:active:not(:disabled) {
-      border: 2px solid var(--shadow);
-      border-top-color: var(--dark-shadow);
-      border-left-color: var(--dark-shadow);
-      border-right-color: var(--highlight);
-      border-bottom-color: var(--highlight);
-      padding-top: 7px;
+
+    .win-btn:active:not(:disabled) {
+      border-color: var(--win-dark) var(--win-light) var(--win-light) var(--win-dark);
+      box-shadow: none;
+      padding-top: 9px;
       padding-left: 15px;
-      padding-bottom: 5px;
+      padding-bottom: 7px;
       padding-right: 13px;
     }
-    .btn:disabled {
-      color: var(--edge);
+
+    .win-btn:disabled {
+      color: #808080;
+      text-shadow: 1px 1px 0 #fff;
       cursor: wait;
     }
-    .footer {
-      margin-top: 1rem;
-      font-size: 0.82rem;
-      color: var(--text-muted);
+
+    .help-line {
+      margin: 14px 0 0;
+      font-size: 0.95rem;
     }
-    .footer a {
-      color: #8a2be2;
+
+    .help-line a {
+      color: var(--link-blue);
+      text-decoration: underline;
     }
+
+    .help-line a:visited {
+      color: var(--link-purple);
+    }
+
     .err {
-      color: #b00020;
-      font-size: 0.88rem;
-      margin-top: 0.75rem;
+      color: #800000;
+      font-size: 0.9rem;
+      margin-top: 10px;
+      font-family: "VT323", monospace;
     }
-    .ver {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      margin-top: 0.5rem;
+
+    /* Windows 95–style taskbar */
+    .taskbar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 200;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 6px;
+      background: var(--taskbar);
+      border-top: 2px solid;
+      border-color: var(--win-light) var(--win-dark) var(--win-dark) var(--win-light);
+      box-shadow: 0 -2px 0 rgba(0, 0, 0, 0.15);
+    }
+
+    .taskbar-start {
+      font-family: "VT323", monospace;
+      font-size: 1.15rem;
+      padding: 2px 12px 3px;
+      background: var(--win-grey);
+      border: 2px solid;
+      border-color: var(--win-light) var(--win-dark) var(--win-dark) var(--win-light);
+      font-weight: 700;
+    }
+
+    .taskbar-clock {
+      font-family: "VT323", monospace;
+      font-size: 1.2rem;
+      padding: 2px 10px;
+      background: var(--win-grey);
+      border: 2px solid;
+      border-color: var(--win-dark) var(--win-light) var(--win-light) var(--win-dark);
+      color: #111;
+      min-width: 5.5em;
+      text-align: center;
+    }
+
+    @media (max-width: 420px) {
+      .hero-title { font-size: 0.55rem; letter-spacing: 0.04em; }
+      .media-row { flex-direction: column; align-items: center; text-align: center; }
+      .disk-stack { margin: 0 auto; }
     }
   </style>
 </head>
 <body>
-  <div class="rainbow" aria-hidden="true"></div>
-  <div class="wrap">
-    <div class="panel">
-      <h1>Citatio</h1>
-      <p class="muted">Artículos más citados en Google Scholar. Exporta CSV o Excel.</p>
-      <div class="btn-wrap">
-        <a id="dl" class="btn" href="#">Descargar para Windows</a>
-        <p id="ver" class="ver" style="display:none;"></p>
-        <p id="err" class="err" style="display:none;"></p>
-      </div>
-      <p class="footer">
-        ¿Problemas? <a id="gh" href="https://github.com/SIMI2COOL/Citatio/releases/latest" target="_blank" rel="noopener">Ver descargas en GitHub</a>
-      </p>
-    </div>
+  <div class="mac-rainbow" aria-hidden="true">
+    <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
   </div>
+
+  <div class="crt-vignette" aria-hidden="true"></div>
+  <div class="crt-overlay" aria-hidden="true"></div>
+
+  <main class="main-inner">
+    <h1 class="hero-title">CITATIO</h1>
+
+    <div class="win-outer" role="dialog" aria-labelledby="win-title">
+      <div class="title-bar">
+        <span class="title-text" id="win-title">Citatio — Instalador</span>
+        <div class="title-controls">
+          <button type="button" class="title-btn" aria-label="Minimizar" title="Minimizar">_</button>
+          <button type="button" class="title-btn" aria-label="Maximizar" title="Maximizar">□</button>
+          <button type="button" class="title-btn" aria-label="Cerrar" title="Cerrar">×</button>
+        </div>
+      </div>
+      <div class="win-body">
+        <div class="media-row">
+          <div class="disk-stack" aria-hidden="true">
+            <div class="cd"></div>
+            <div class="floppy"></div>
+          </div>
+          <p class="blurb">
+            Encuentra y ordena los artículos más citados en Google Scholar. Exporta resultados limpios a <strong>CSV</strong> o <strong>Excel</strong>.
+          </p>
+        </div>
+        <p class="version-line" id="ver-line">Versión <strong>v1.0.5</strong></p>
+        <a id="dl" class="win-btn" href="#">Descargar para Windows</a>
+        <p id="err" class="err" style="display:none;"></p>
+        <p class="help-line">
+          ¿Problemas?
+          <a id="gh" href="https://github.com/SIMI2COOL/Citatio/releases/latest" target="_blank" rel="noopener">Ver descargas en GitHub</a>
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="taskbar" role="contentinfo">
+    <span class="taskbar-start">Start</span>
+    <span class="taskbar-clock" id="clock" aria-live="polite">00:00:00</span>
+  </footer>
+
   <script>
     (function () {
       var dl = document.getElementById("dl");
-      var ver = document.getElementById("ver");
+      var verLine = document.getElementById("ver-line");
       var err = document.getElementById("err");
       var fallback = "https://github.com/SIMI2COOL/Citatio/releases/latest";
+      var defaultVer = "v1.0.5";
+
+      function setClock() {
+        var el = document.getElementById("clock");
+        if (!el) return;
+        var now = new Date();
+        el.textContent = now.toLocaleTimeString(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        });
+      }
+      setClock();
+      setInterval(setClock, 1000);
+
+      /* Decorative title bar buttons */
+      document.querySelectorAll(".title-btn").forEach(function (b) {
+        b.addEventListener("click", function (e) {
+          e.preventDefault();
+        });
+      });
+
+      /* Optional startup chirp (browsers often block until user interacts) */
+      var bootPlayed = false;
+      function playBootSound() {
+        if (bootPlayed) return;
+        bootPlayed = true;
+        try {
+          var Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) return;
+          var ctx = new Ctx();
+          if (ctx.state === "suspended") ctx.resume();
+          var o = ctx.createOscillator();
+          var g = ctx.createGain();
+          o.type = "square";
+          o.frequency.value = 880;
+          g.gain.setValueAtTime(0.0001, ctx.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.06, ctx.currentTime + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+          o.connect(g);
+          g.connect(ctx.destination);
+          o.start(ctx.currentTime);
+          o.stop(ctx.currentTime + 0.15);
+        } catch (e) { /* ignore */ }
+      }
+      window.addEventListener("load", function () {
+        setTimeout(playBootSound, 400);
+      });
+      document.body.addEventListener("pointerdown", playBootSound, { once: true });
 
       dl.href = fallback;
       dl.textContent = "Buscando última versión…";
@@ -175,28 +548,29 @@
           var exe = assets.find(function (a) {
             return /^Citatio-Setup-.+\.exe$/i.test(a.name);
           });
+          if (data.tag_name) {
+            verLine.innerHTML = "Versión <strong>" + data.tag_name + "</strong>";
+          }
           if (exe && exe.browser_download_url) {
             dl.href = exe.browser_download_url;
             dl.download = exe.name;
             dl.textContent = "Descargar para Windows";
             dl.removeAttribute("aria-busy");
-            if (data.tag_name) {
-              ver.textContent = "Versión " + data.tag_name;
-              ver.style.display = "block";
-            }
           } else {
             dl.href = fallback;
             dl.textContent = "Abrir página de descarga";
             dl.removeAttribute("aria-busy");
-            err.textContent = "No encontré el instalador .exe en esta versión. Usa el enlace de GitHub.";
+            err.textContent = "No encontré el instalador .exe. Usa el enlace de GitHub.";
             err.style.display = "block";
+            verLine.innerHTML = "Versión <strong>" + (data.tag_name || defaultVer) + "</strong>";
           }
         })
         .catch(function () {
           dl.href = fallback;
           dl.textContent = "Abrir página de descarga";
           dl.removeAttribute("aria-busy");
-          err.textContent = "No pude conectar. Usa el enlace de GitHub abajo.";
+          verLine.innerHTML = "Versión <strong>" + defaultVer + "</strong>";
+          err.textContent = "Sin conexión a GitHub. Usa el enlace abajo.";
           err.style.display = "block";
         });
     })();
