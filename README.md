@@ -278,6 +278,10 @@ The repo includes a simple landing page at `docs/index.html` with a big **Downlo
 
 You only publish new app versions the same way as before (new release tag). The landing page keeps working without editing the HTML each time.
 
+### Vercel (same look as the app, one download button)
+
+A dedicated static page lives in **`website/`** — platinum grey UI + rainbow strip, matching `desktop/theme.py`. Deploy that folder on Vercel (set **Root Directory** to `website`). See **`website/README.md`** for step-by-step.
+
 ## Search tips ✨
 
 Inside the app you can use:

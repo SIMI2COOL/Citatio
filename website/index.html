@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Citatio — Descargar</title>
+  <meta name="description" content="Descarga Citatio para Windows." />
+  <style>
+    /* Matches desktop/theme.py — LIGHT palette + rainbow strip */
+    :root {
+      --surface: #f0f0f0;
+      --chrome: #c0c0c0;
+      --edge: #909090;
+      --shadow: #606060;
+      --highlight: #ffffff;
+      --light-edge: #dfdfdf;
+      --dark-shadow: #404040;
+      --text: #1a1a1a;
+      --text-muted: #606060;
+      --field: #ffffff;
+      --green: #6abd45;
+      --yellow: #f5bc00;
+      --orange: #f6821f;
+      --red: #e2231a;
+      --purple: #8a2be2;
+      --blue: #009cde;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+    }
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, "Helvetica Neue", sans-serif;
+      font-size: 15px;
+      color: var(--text);
+      background: var(--surface);
+      line-height: 1.45;
+    }
+    .rainbow {
+      height: 10px;
+      background: linear-gradient(
+        90deg,
+        var(--green) 0%,
+        var(--yellow) 20%,
+        var(--orange) 40%,
+        var(--red) 60%,
+        var(--purple) 80%,
+        var(--blue) 100%
+      );
+    }
+    .wrap {
+      max-width: 440px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+    }
+    .panel {
+      background: var(--field);
+      border: 2px solid var(--edge);
+      border-top-color: var(--shadow);
+      border-left-color: var(--shadow);
+      border-right-color: var(--highlight);
+      border-bottom-color: var(--light-edge);
+      padding: 1.25rem 1.35rem;
+    }
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin: 0 0 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    .muted {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      margin: 0 0 1.25rem;
+    }
+    .btn-wrap {
+      margin-top: 0.5rem;
+    }
+    /* Raised button — same logic as QPushButton in theme.py */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 34px;
+      padding: 6px 14px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: normal;
+      color: var(--text);
+      background: var(--chrome);
+      cursor: pointer;
+      text-decoration: none;
+      border-radius: 0;
+      border: 2px solid var(--shadow);
+      border-top-color: var(--highlight);
+      border-left-color: var(--highlight);
+      border-right-color: var(--dark-shadow);
+      border-bottom-color: var(--dark-shadow);
+      transition: none;
+    }
+    .btn:hover {
+      filter: brightness(1.03);
+    }
+    .btn:active:not(:disabled) {
+      border: 2px solid var(--shadow);
+      border-top-color: var(--dark-shadow);
+      border-left-color: var(--dark-shadow);
+      border-right-color: var(--highlight);
+      border-bottom-color: var(--highlight);
+      padding-top: 7px;
+      padding-left: 15px;
+      padding-bottom: 5px;
+      padding-right: 13px;
+    }
+    .btn:disabled {
+      color: var(--edge);
+      cursor: wait;
+    }
+    .footer {
+      margin-top: 1rem;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+    .footer a {
+      color: #8a2be2;
+    }
+    .err {
+      color: #b00020;
+      font-size: 0.88rem;
+      margin-top: 0.75rem;
+    }
+    .ver {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="rainbow" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="panel">
+      <h1>Citatio</h1>
+      <p class="muted">Artículos más citados en Google Scholar. Exporta CSV o Excel.</p>
+      <div class="btn-wrap">
+        <a id="dl" class="btn" href="#">Descargar para Windows</a>
+        <p id="ver" class="ver" style="display:none;"></p>
+        <p id="err" class="err" style="display:none;"></p>
+      </div>
+      <p class="footer">
+        ¿Problemas? <a id="gh" href="https://github.com/SIMI2COOL/Citatio/releases/latest" target="_blank" rel="noopener">Ver descargas en GitHub</a>
+      </p>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var dl = document.getElementById("dl");
+      var ver = document.getElementById("ver");
+      var err = document.getElementById("err");
+      var fallback = "https://github.com/SIMI2COOL/Citatio/releases/latest";
+
+      dl.href = fallback;
+      dl.textContent = "Buscando última versión…";
+      dl.setAttribute("aria-busy", "true");
+
+      fetch("https://api.github.com/repos/SIMI2COOL/Citatio/releases/latest")
+        .then(function (r) {
+          if (!r.ok) throw new Error("api");
+          return r.json();
+        })
+        .then(function (data) {
+          var assets = data.assets || [];
+          var exe = assets.find(function (a) {
+            return /^Citatio-Setup-.+\.exe$/i.test(a.name);
+          });
+          if (exe && exe.browser_download_url) {
+            dl.href = exe.browser_download_url;
+            dl.download = exe.name;
+            dl.textContent = "Descargar para Windows";
+            dl.removeAttribute("aria-busy");
+            if (data.tag_name) {
+              ver.textContent = "Versión " + data.tag_name;
+              ver.style.display = "block";
+            }
+          } else {
+            dl.href = fallback;
+            dl.textContent = "Abrir página de descarga";
+            dl.removeAttribute("aria-busy");
+            err.textContent = "No encontré el instalador .exe en esta versión. Usa el enlace de GitHub.";
+            err.style.display = "block";
+          }
+        })
+        .catch(function () {
+          dl.href = fallback;
+          dl.textContent = "Abrir página de descarga";
+          dl.removeAttribute("aria-busy");
+          err.textContent = "No pude conectar. Usa el enlace de GitHub abajo.";
+          err.style.display = "block";
+        });
+    })();
+  </script>
+</body>
+</html>
