@@ -1,4 +1,4 @@
-name: Build and Attach Downloadable Apps
+name: Build and Attach Windows Installer
 
 on:
   release:
@@ -32,101 +32,30 @@ jobs:
         run: |
           .\desktop\build_windows.ps1
 
-      - name: Package Windows release zip
+      - name: Install Inno Setup
         shell: powershell
         run: |
-          New-Item -ItemType Directory -Path .\release -Force | Out-Null
-          Copy-Item .\desktop\dist\Citatio.exe .\release\Citatio.exe -Force
-          Copy-Item .\desktop\run_packaged_and_install.bat .\release\run_packaged_and_install.bat -Force
-          Compress-Archive -Path .\release\* -DestinationPath .\Citatio-Windows.zip -Force
+          choco install innosetup --no-progress -y
 
-      - name: Attach zip to release
+      - name: Build installer (.exe)
+        shell: powershell
+        run: |
+          $version = if ("${{ github.event_name }}" -eq "release") { "${{ github.ref_name }}" } else { "manual-${{ github.run_number }}" }
+          if ($version.StartsWith("v")) { $version = $version.Substring(1) }
+          $safeVersion = $version -replace '[^0-9A-Za-z\.\-_]', '-'
+          $installerName = "Citatio-Setup-$safeVersion"
+          iscc /DMyAppVersion=$safeVersion /DMyOutputBaseFilename=$installerName .\desktop\CitatioInstaller.iss
+          "INSTALLER_PATH=desktop/dist/$installerName.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload installer artifact (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Citatio-Setup
+          path: ${{ env.INSTALLER_PATH }}
+
+      - name: Attach installer to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: Citatio-Windows.zip
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install app dependencies
-        shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r ./desktop/requirements.txt
-          python -m pip install pyinstaller
-
-      - name: Build macOS app bundle
-        shell: bash
-        run: |
-          chmod +x ./desktop/build_macos.sh
-          ./desktop/build_macos.sh
-
-      - name: Package macOS release zip
-        shell: bash
-        run: |
-          rm -f Citatio-Mac.zip
-          cd desktop
-          zip -r ../Citatio-Mac.zip dist/Citatio.app
-
-      - name: Attach zip to release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: Citatio-Mac.zip
-
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install app dependencies
-        shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r ./desktop/requirements.txt
-          python -m pip install pyinstaller
-
-      - name: Build Linux executable
-        shell: bash
-        run: |
-          chmod +x ./desktop/build_linux.sh
-          ./desktop/build_linux.sh
-
-      - name: Package Linux release zip
-        shell: bash
-        run: |
-          rm -f Citatio-Linux.zip
-          rm -rf release-linux
-          mkdir release-linux
-          cp ./desktop/dist/Citatio ./release-linux/Citatio
-          chmod +x ./release-linux/Citatio
-          cat > ./release-linux/run.sh <<'EOF'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-          exec "$DIR/Citatio"
-          EOF
-          chmod +x ./release-linux/run.sh
-          cd release-linux
-          zip -r ../Citatio-Linux.zip .
-
-      - name: Attach zip to release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: Citatio-Linux.zip
+          files: ${{ env.INSTALLER_PATH }}

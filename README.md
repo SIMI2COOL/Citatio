@@ -238,7 +238,7 @@ From the repo root, you can also run:
 - Windows: `.\run.bat`
 - macOS/Linux: `./run.sh`
 
-## Publish as downloadable app (no repo required)
+## Publish as downloadable app (Windows installer, no repo required)
 
 You can publish Citatio so people download it from a web page, without cloning this repository.
 
@@ -248,10 +248,9 @@ This repository includes a GitHub Actions workflow at:
 `.github/workflows/release-windows.yml`
 
 It automatically:
-- Builds `Citatio.exe` on Windows and packages `Citatio-Windows.zip`
-- Builds `Citatio.app` on macOS and packages `Citatio-Mac.zip`
-- Builds `Citatio` on Linux and packages `Citatio-Linux.zip`
-- Attaches the zip files to your GitHub Release
+- Builds `Citatio.exe` on Windows
+- Creates a real installer: `Citatio-Setup-<version>.exe`
+- Attaches that installer to your GitHub Release
 
 ### How to publish each app version
 
@@ -259,7 +258,7 @@ It automatically:
 2. Go to **Releases** -> **Draft a new release**.
 3. Create a tag like `v1.0.0` and publish.
 4. Wait for the workflow to finish (Actions tab).
-5. The release will contain `Citatio-Windows.zip`, `Citatio-Mac.zip`, and `Citatio-Linux.zip` as downloadable files.
+5. The release will contain `Citatio-Setup-<version>.exe` as a downloadable installer.
 
 Then share this link:
 `https://github.com/<your-username>/Citatio/releases/latest`
