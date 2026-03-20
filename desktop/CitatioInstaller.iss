@@ -23,10 +23,11 @@ Name: "desktopicon"; Description: "Create a desktop icon"; GroupDescription: "Ad
 
 [Files]
 Source: "dist\Citatio.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\svgviewer-output (3) (1).ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Citatio"; Filename: "{app}\Citatio.exe"
-Name: "{commondesktop}\Citatio"; Filename: "{app}\Citatio.exe"; Tasks: desktopicon
+Name: "{group}\Citatio"; Filename: "{app}\Citatio.exe"; IconFilename: "{app}\svgviewer-output (3) (1).ico"
+Name: "{commondesktop}\Citatio"; Filename: "{app}\Citatio.exe"; IconFilename: "{app}\svgviewer-output (3) (1).ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\Citatio.exe"; Description: "Launch Citatio"; Flags: nowait postinstall skipifsilent
