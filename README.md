@@ -12,6 +12,111 @@ Prerequisites:
 - Git
 - Internet access
 
+## Install Python (easy, if you don't have it)
+
+First, check if Python is already installed:
+
+```bash
+python --version
+```
+
+On Windows, also check:
+
+```powershell
+py -V
+```
+
+If you see a Python version number, you are done.
+
+If you see an error like "python is not recognized" or "py is not recognized", install Python using the steps below.
+
+## Windows (PowerShell)
+
+Install Python with:
+
+```powershell
+winget install --id Python.Python.3.12 -e
+```
+
+If `winget` is not found, download and install from:
+https://www.python.org/downloads/windows/
+
+Important during install:
+- Enable **Add python.exe to PATH**
+- Enable **Install launcher for all users (recommended)** (this installs the `py` command)
+
+After install, close and reopen PowerShell, then run:
+
+```powershell
+python --version
+py -V
+```
+
+## macOS (Terminal)
+
+Install Python with:
+
+```bash
+brew install python
+```
+
+If Homebrew is not installed yet, install it first from:
+https://brew.sh/
+
+Then verify:
+
+```bash
+python3 --version
+```
+
+## Linux (Terminal)
+
+Ubuntu/Debian:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-pip
+```
+
+Fedora:
+
+```bash
+sudo dnf install -y python3 python3-pip
+```
+
+Arch:
+
+```bash
+sudo pacman -S --noconfirm python python-pip
+```
+
+Then verify:
+
+```bash
+python3 --version
+```
+
+## Troubleshooting (Windows)
+
+### Error: `'py' is not recognized as an internal or external command`
+
+This means the Python launcher is missing (or not available in your PATH).
+
+Fix:
+1. Re-run Python installer from https://www.python.org/downloads/windows/
+2. Make sure this option is checked:
+   - **Install launcher for all users (recommended)**
+3. Also check:
+   - **Add python.exe to PATH**
+4. Close and reopen PowerShell, then test:
+
+```powershell
+py -V
+python --version
+```
+
+If `py` still fails but `python --version` works, you can still run Citatio by replacing `py` with `python` in commands.
+
 ## Install Git (easy, if you don't have it)
 
 First, check if Git is already installed:
@@ -132,6 +237,32 @@ You can add it to your Desktop with the icon, so you can just double click it to
 From the repo root, you can also run:
 - Windows: `.\run.bat`
 - macOS/Linux: `./run.sh`
+
+## Publish as downloadable app (no repo required)
+
+You can publish Citatio so people download it from a web page, without cloning this repository.
+
+### One-time setup
+
+This repository includes a GitHub Actions workflow at:
+`.github/workflows/release-windows.yml`
+
+It automatically:
+- Builds `Citatio.exe` on Windows and packages `Citatio-Windows.zip`
+- Builds `Citatio.app` on macOS and packages `Citatio-Mac.zip`
+- Builds `Citatio` on Linux and packages `Citatio-Linux.zip`
+- Attaches the zip files to your GitHub Release
+
+### How to publish each app version
+
+1. Open your GitHub repository in the browser.
+2. Go to **Releases** -> **Draft a new release**.
+3. Create a tag like `v1.0.0` and publish.
+4. Wait for the workflow to finish (Actions tab).
+5. The release will contain `Citatio-Windows.zip`, `Citatio-Mac.zip`, and `Citatio-Linux.zip` as downloadable files.
+
+Then share this link:
+`https://github.com/<your-username>/Citatio/releases/latest`
 
 ## Search tips ✨
 

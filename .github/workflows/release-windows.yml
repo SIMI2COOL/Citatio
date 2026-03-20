@@ -1,0 +1,132 @@
+name: Build and Attach Downloadable Apps
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install app dependencies
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r .\desktop\requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Build Windows executable
+        shell: powershell
+        run: |
+          .\desktop\build_windows.ps1
+
+      - name: Package Windows release zip
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Path .\release -Force | Out-Null
+          Copy-Item .\desktop\dist\Citatio.exe .\release\Citatio.exe -Force
+          Copy-Item .\desktop\run_packaged_and_install.bat .\release\run_packaged_and_install.bat -Force
+          Compress-Archive -Path .\release\* -DestinationPath .\Citatio-Windows.zip -Force
+
+      - name: Attach zip to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Citatio-Windows.zip
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install app dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r ./desktop/requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Build macOS app bundle
+        shell: bash
+        run: |
+          chmod +x ./desktop/build_macos.sh
+          ./desktop/build_macos.sh
+
+      - name: Package macOS release zip
+        shell: bash
+        run: |
+          rm -f Citatio-Mac.zip
+          cd desktop
+          zip -r ../Citatio-Mac.zip dist/Citatio.app
+
+      - name: Attach zip to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Citatio-Mac.zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install app dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r ./desktop/requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Build Linux executable
+        shell: bash
+        run: |
+          chmod +x ./desktop/build_linux.sh
+          ./desktop/build_linux.sh
+
+      - name: Package Linux release zip
+        shell: bash
+        run: |
+          rm -f Citatio-Linux.zip
+          rm -rf release-linux
+          mkdir release-linux
+          cp ./desktop/dist/Citatio ./release-linux/Citatio
+          chmod +x ./release-linux/Citatio
+          cat > ./release-linux/run.sh <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+          exec "$DIR/Citatio"
+          EOF
+          chmod +x ./release-linux/run.sh
+          cd release-linux
+          zip -r ../Citatio-Linux.zip .
+
+      - name: Attach zip to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Citatio-Linux.zip
