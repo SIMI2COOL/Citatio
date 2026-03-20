@@ -12,6 +12,8 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
+SetupIconFile=dist\svgviewer-output (3) (1).ico
+UninstallDisplayIcon={app}\Citatio.exe
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
