@@ -1,6 +1,6 @@
 # Citatio — página de descarga (Vercel)
 
-Esta carpeta es una **web estática de una sola página** con el mismo estilo visual que la app (tema claro “platinum” de `desktop/theme.py`): franja arcoíris y botón tipo Windows 3D.
+Esta carpeta es una **web estática de una sola página** con estilo **retro**: rayas horizontales tipo IBM (azul marino), ruido y scanlines CRT, título **CITATIO** en pixel (Press Start 2P) con brillo ámbar, ventana estilo Win95/Mac OS 9, barra arcoíris superior tipo Mac clásico, taskbar abajo con reloj, cursor flecha clásico y pitido de arranque opcional (Web Audio).
 
 El botón **Descargar para Windows** obtiene automáticamente el último `Citatio-Setup-*.exe` desde [GitHub Releases](https://github.com/SIMI2COOL/Citatio/releases).
 
