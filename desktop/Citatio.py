@@ -15,13 +15,16 @@ import shutil
 import stat
 from typing import Any, List, Optional, Tuple
 
-from PySide6.QtCore import QAbstractTableModel, QEvent, QModelIndex, QObject, Qt, QThread, QTimer, Signal, QUrl
-from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QIcon, QKeySequence, QPainter, QPen
+from PySide6.QtCore import QAbstractTableModel, QEvent, QModelIndex, QObject, QPoint, QRect, Qt, QThread, QTimer, Signal, QUrl
+from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QIcon, QKeySequence, QPainter, QPen, QPalette
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QCheckBox,
     QComboBox,
     QAbstractSpinBox,
+    QFileDialog,
+    QFormLayout,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -30,6 +33,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QStyleFactory,
     QTableView,
     QSizePolicy,
     QVBoxLayout,
@@ -37,10 +41,90 @@ from PySide6.QtWidgets import (
     QProgressBar,
 )
 
-from theme import PAL, qss
+from theme import LIGHT, palette_for_mode, qss
 
 
 APP_NAME = "Citatio"
+
+
+def _windows_native_clear_maximized(window: QWidget) -> None:
+    """
+    Quita WS_MAXIMIZE a nivel de Windows. Sin esto, ventanas sin marco pueden
+    quedar 'pegadas' a pantalla completa y Qt no puede cambiar setGeometry
+    (ver QWindowsWindow::setGeometry ... Resulting geometry no cambia).
+    """
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        import ctypes
+
+        hwnd = int(window.winId())
+        if not hwnd:
+            return
+        user32 = ctypes.windll.user32
+        SW_RESTORE = 9
+        user32.ShowWindow(hwnd, SW_RESTORE)
+
+        GWL_STYLE = -16
+        WS_MAXIMIZE = 0x01000000
+        SWP_NOMOVE = 0x0002
+        SWP_NOSIZE = 0x0001
+        SWP_NOZORDER = 0x0004
+        SWP_FRAMECHANGED = 0x0020
+
+        try:
+            get_long = user32.GetWindowLongPtrW
+            set_long = user32.SetWindowLongPtrW
+        except AttributeError:
+            get_long = user32.GetWindowLongW
+            set_long = user32.SetWindowLongW
+
+        style = int(get_long(hwnd, GWL_STYLE))
+        if style & WS_MAXIMIZE:
+            set_long(hwnd, GWL_STYLE, style & ~WS_MAXIMIZE)
+        user32.SetWindowPos(
+            hwnd,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+        )
+    except Exception:
+        pass
+
+
+class SortByComboBox(QComboBox):
+    """Force list popup to open directly below the control (always drops down)."""
+
+    def showPopup(self) -> None:  # noqa: N802
+        super().showPopup()
+        container = self.view().window()
+        if container is None or not container.isVisible():
+            return
+        pos = self.mapToGlobal(QPoint(0, self.height()))
+        w = max(self.width(), container.width())
+        h = container.height()
+        container.setGeometry(pos.x(), pos.y(), w, h)
+
+
+def _make_combo_popup_opaque(combo: QComboBox, field_bg: str | None = None) -> None:
+    """Windows native popups can ignore QSS; force an opaque list background."""
+    view = combo.view()
+    view.setAttribute(Qt.WA_TranslucentBackground, False)
+    view.setAutoFillBackground(True)
+    vp = view.viewport()
+    vp.setAttribute(Qt.WA_TranslucentBackground, False)
+    vp.setAutoFillBackground(True)
+    if field_bg:
+        c = QColor(field_bg)
+        pal = view.palette()
+        pal.setColor(QPalette.ColorRole.Base, c)
+        pal.setColor(QPalette.ColorRole.Window, c)
+        pal.setColor(QPalette.ColorRole.AlternateBase, c)
+        view.setPalette(pal)
+        vp.setPalette(pal)
 
 
 def _resolve_dist_icon() -> Path | None:
@@ -418,6 +502,18 @@ class ResultsModel(QAbstractTableModel):
         super().__init__()
         self.headers: List[str] = []
         self.rows: List[List[Any]] = []
+        self._link_color = LIGHT.link
+        self._row_a = LIGHT.surface
+        self._row_b = LIGHT.alt_row
+
+    def apply_palette(self, pal) -> None:
+        self._link_color = pal.link
+        self._row_a = pal.surface
+        self._row_b = pal.alt_row
+        if self.rowCount() > 0 and self.columnCount() > 0:
+            top_left = self.index(0, 0)
+            bottom_right = self.index(self.rowCount() - 1, self.columnCount() - 1)
+            self.dataChanged.emit(top_left, bottom_right)
 
     def set_results(self, headers: List[str], rows: List[List[Any]]) -> None:
         self.beginResetModel()
@@ -448,7 +544,7 @@ class ResultsModel(QAbstractTableModel):
                 s = "" if v is None else str(v)
                 if s.startswith("http://") or s.startswith("https://"):
                     if role == Qt.ForegroundRole:
-                        return QColor(PAL.purple)
+                        return QColor(self._link_color)
                     f = QFont()
                     f.setUnderline(True)
                     return f
@@ -456,8 +552,7 @@ class ResultsModel(QAbstractTableModel):
                 return None
 
         if role == Qt.BackgroundRole:
-            # Zebra rows: #F0F0F0 / #FFFFFF
-            return QColor(PAL.surface if (r % 2 == 0) else "#FFFFFF")
+            return QColor(self._row_a if (r % 2 == 0) else self._row_b)
 
         return None
 
@@ -559,7 +654,7 @@ class RainbowHeader(QWidget):
         self.update()
 
     def paintEvent(self, event):  # noqa: N802
-        colors = [PAL.green, PAL.yellow, PAL.orange, PAL.red, PAL.purple, PAL.blue]
+        colors = [LIGHT.green, LIGHT.yellow, LIGHT.orange, LIGHT.red, LIGHT.purple, LIGHT.blue]
         stripe_h = max(1, self.height() // len(colors))
         p = QPainter(self)
 
@@ -608,13 +703,14 @@ class BevelFrame(QWidget):
         inner_px = max(2, thickness // 3)  # inner gray thickness
 
         for i in range(thickness):
+            pal = getattr(self.window(), "_pal", LIGHT)
             top_left_pen = (
-                PAL.bevel_highlight if i < highlight_px else PAL.bevel_inner
+                pal.bevel_highlight if i < highlight_px else pal.bevel_inner
             )
 
             # Bottom/right stay dark on the outside, then become inner gray, then dark again.
             bottom_right_pen = (
-                PAL.bevel_shadow if i < highlight_px or i >= highlight_px + inner_px else PAL.bevel_inner
+                pal.bevel_shadow if i < highlight_px or i >= highlight_px + inner_px else pal.bevel_inner
             )
 
             # Top and left
@@ -631,16 +727,29 @@ class BevelFrame(QWidget):
 class PlatinumTitleBar(QWidget):
     close_clicked = Signal()
     minimize_clicked = Signal()
-    zoom_clicked = Signal()
+    restore_clicked = Signal()  # green: shrink / center window
+    maximize_toggle_clicked = Signal()  # double-click title: maximize toggle
 
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.setFixedHeight(26)
         self._drag_pos = None
+        self._pal = palette_for_mode("light")
+
+    def set_palette(self, pal) -> None:
+        self._pal = pal
+        self.update()
 
     def mousePressEvent(self, event):  # noqa: N802
         if event.button() == Qt.LeftButton:
-            self._drag_pos = event.globalPosition().toPoint()
+            px, py = event.position().x(), event.position().y()
+            on_btn = False
+            for (x, y, w, h) in self._button_rects():
+                if x <= px <= x + w and y <= py <= y + h:
+                    on_btn = True
+                    break
+            if not on_btn:
+                self._drag_pos = event.globalPosition().toPoint()
             event.accept()
 
     def mouseMoveEvent(self, event):  # noqa: N802
@@ -652,14 +761,13 @@ class PlatinumTitleBar(QWidget):
         event.accept()
 
     def mouseDoubleClickEvent(self, event):  # noqa: N802
-        # "Zoom" behavior on title bar double click (simple maximize toggle)
-        self.zoom_clicked.emit()
+        self.maximize_toggle_clicked.emit()
 
     def _button_rects(self):
         # Right side cluster, ordered: yellow(min), green(max), red(close)
-        size = 12
+        size = 16
         gap = 6
-        y = 7
+        y = 5
         x_right = self.width() - 10
         red = (x_right - size, y, size, size)
         green = (x_right - size - gap - size, y, size, size)
@@ -672,7 +780,7 @@ class PlatinumTitleBar(QWidget):
             yellow, green, red = self._button_rects()
             for which, (x, y, w, h) in (
                 ("min", yellow),
-                ("zoom", green),
+                ("restore", green),
                 ("close", red),
             ):
                 if x <= px <= x + w and y <= py <= y + h:
@@ -680,17 +788,17 @@ class PlatinumTitleBar(QWidget):
                         self.close_clicked.emit()
                     elif which == "min":
                         self.minimize_clicked.emit()
-                    else:
-                        self.zoom_clicked.emit()
+                    elif which == "restore":
+                        self.restore_clicked.emit()
                     break
         self._drag_pos = None
         event.accept()
 
     def paintEvent(self, event):  # noqa: N802
         p = QPainter(self)
-        # Pinstripe title bar in chrome/edge
-        p.fillRect(self.rect(), QColor(PAL.chrome))
-        pen = QPen(QColor(PAL.edge))
+        # Grey platinum title bar (pinstripe)
+        p.fillRect(self.rect(), QColor(self._pal.chrome))
+        pen = QPen(QColor(self._pal.edge))
         p.setPen(pen)
         for yy in range(0, self.height(), 2):
             p.drawLine(0, yy, self.width(), yy)
@@ -705,12 +813,23 @@ class PlatinumTitleBar(QWidget):
             p.setPen(QColor("#000000"))
             p.setBrush(QColor(fill))
             p.drawRect(x, y, w, h)
+            # Small in-button symbols for clarity.
+            p.setPen(QColor("#111111"))
+            if fill == "#F5BC00":  # minimize
+                p.drawLine(x + 4, y + h - 5, x + w - 4, y + h - 5)
+            elif fill == "#6ABD45":  # restore / shrink toward center
+                p.drawRect(x + 4, y + 6, w - 9, h - 10)
+                p.drawRect(x + 6, y + 4, w - 9, h - 10)
+            else:  # close
+                p.drawLine(x + 4, y + 4, x + w - 4, y + h - 4)
+                p.drawLine(x + w - 4, y + 4, x + 4, y + h - 4)
 
         # Title text (avoid button cluster)
-        p.setPen(QColor(PAL.shadow))
+        p.setPen(QColor("#000000"))
         title_font = QFont()
         title_font.setPointSize(14)
         title_font.setBold(True)
+        title_font.setFamilies(["Chicago", "Geneva", "Helvetica Neue", "Tahoma", "MS Sans Serif", "sans-serif"])
         p.setFont(title_font)
         left_pad = 10
         right_limit = yellow[0] - 10
@@ -720,6 +839,9 @@ class PlatinumTitleBar(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
+        self._theme_mode = "light"
+        self._pal = palette_for_mode(self._theme_mode)
+        self._save_dir = Path.home() / "Downloads"
         self.setWindowTitle(APP_NAME)
         self.setMinimumSize(980, 640)
 
@@ -732,11 +854,12 @@ class MainWindow(QMainWindow):
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
 
-        # Frameless window frame (Mac OS-style bevel).
-        # Keep this in sync with the bevel thickness drawn in paintEvent().
+        # Frameless window frame — thick outer bevel (matches BevelFrame thickness).
         self._frame_margin = 20
-        # Wider hit area so resizing feels dynamic even while dragging quickly.
-        self._resize_edge = 7
+        # Outer rim hit band (2px is too small on Windows / HiDPI; 8px is still “edge only”).
+        self._resize_edge = 8
+        self._manual_resize_edges: Qt.Edge | None = None
+        self._resize_last_global: QPoint | None = None
 
         outer = BevelFrame(self)
         self.outer_layout = QVBoxLayout(outer)
@@ -751,7 +874,9 @@ class MainWindow(QMainWindow):
         self.titlebar = PlatinumTitleBar(outer)
         self.titlebar.close_clicked.connect(self.close)
         self.titlebar.minimize_clicked.connect(self.showMinimized)
-        self.titlebar.zoom_clicked.connect(self._toggle_maximize)
+        self.titlebar.restore_clicked.connect(self._restore_centered_window)
+        self.titlebar.maximize_toggle_clicked.connect(self._toggle_maximize)
+        self.titlebar.set_palette(self._pal)
         self.outer_layout.addWidget(self.titlebar)
         self.outer_layout.addWidget(RainbowHeader())
 
@@ -763,32 +888,28 @@ class MainWindow(QMainWindow):
         self.setMouseTracking(True)
 
         root = QVBoxLayout(content)
-        root.setContentsMargins(12, 12, 12, 12)
-        root.setSpacing(10)
-
-        form = QWidget()
-        grid = QGridLayout(form)
-        grid.setHorizontalSpacing(6)
-        grid.setVerticalSpacing(8)
-        grid.setColumnMinimumWidth(0, 90)
-        grid.setColumnStretch(0, 0)
-        grid.setColumnStretch(1, 1)
-        grid.setColumnStretch(2, 0)
-        grid.setColumnStretch(3, 1)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(8)
 
         self.keyword = QLineEdit()
+        self.keyword.setObjectName("keywordField")
         self.keyword.setPlaceholderText('e.g. UE-Mercosur OR "UE-Mercosur"')
         self.keyword.textChanged.connect(self._refresh_save_path)
+        self.keyword.setFixedHeight(22)
+        self.keyword.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
-        self.sortby = QComboBox()
+        self.sortby = SortByComboBox()
         self.sortby.addItems(["Citations", "cit/year"])
+        self.sortby.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         self.nresults = QSpinBox()
         self.nresults.setRange(10, 100)
         self.nresults.setSingleStep(5)
         self.nresults.setValue(25)
         self.nresults.setButtonSymbols(QAbstractSpinBox.UpDownArrows)
-        self.nresults.setFixedWidth(90)  # ensure both arrows remain visible
+        self.nresults.setMinimumWidth(88)
+        self.nresults.setMaximumWidth(120)
+        self.nresults.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
         this_year = datetime.datetime.now().year
         self.start_year = QSpinBox()
@@ -796,12 +917,18 @@ class MainWindow(QMainWindow):
         self.start_year.setSpecialValueText("Any")
         self.start_year.setValue(0)
         self.start_year.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.start_year.setButtonSymbols(QAbstractSpinBox.UpDownArrows)
+        self.start_year.setMinimumWidth(88)
+        self.start_year.setMaximumWidth(120)
 
         self.end_year = QSpinBox()
         self.end_year.setRange(0, this_year)
         self.end_year.setSpecialValueText("Any")
         self.end_year.setValue(0)
         self.end_year.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.end_year.setButtonSymbols(QAbstractSpinBox.UpDownArrows)
+        self.end_year.setMinimumWidth(88)
+        self.end_year.setMaximumWidth(120)
 
         self.lang = QComboBox()
         self._lang_map = {
@@ -870,20 +997,27 @@ class MainWindow(QMainWindow):
             "中文（繁體）",
         ]
         self.lang.addItems(ordered)
+        self.lang.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         self.format = QComboBox()
         self.format.addItems(["csv", "xlsx"])
         self.format.currentTextChanged.connect(self._refresh_save_path)
+        self.format.setMinimumWidth(72)
+        self.format.setMaximumWidth(100)
+        self.format.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+        for combo in (self.sortby, self.lang, self.format):
+            _make_combo_popup_opaque(combo, self._pal.field_bg)
 
         self.save_to = QLineEdit()
         self.save_to.setReadOnly(True)
+        self.save_to.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.save_hint = QLabel("(Auto-saved to your Downloads folder)")
-        self.save_hint.setStyleSheet(f"color: {PAL.edge};")
-
-        row = 0
-        grid.addWidget(QLabel("Keyword"), row, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        grid.addWidget(self.keyword, row, 1, 1, 3)
-        row += 1
+        self.save_hint.setObjectName("saveHint")
+        self.choose_folder_btn = QPushButton("Change folder")
+        self.choose_folder_btn.clicked.connect(self._choose_save_folder)
+        self.theme_btn = QPushButton("Switch to dark mode")
+        self.theme_btn.clicked.connect(self._toggle_theme)
 
         self.instructions = QLabel(
             "Examples:\n"
@@ -894,32 +1028,86 @@ class MainWindow(QMainWindow):
             "- UE-Mercosur source:Nature → Search within a specific publication\n"
             '- ("UE-Mercosur" OR "Transformer Models") AND (GPT OR BERT) → Boolean search'
         )
-        self.instructions.setStyleSheet(f"color: {PAL.shadow};")
+        self.instructions.setObjectName("helperText")
         self.instructions.setWordWrap(True)
-        grid.addWidget(self.instructions, row, 1, 1, 3)
-        row += 1
 
-        grid.addWidget(QLabel("Sort by"), row, 0)
-        grid.addWidget(self.sortby, row, 1)
-        grid.addWidget(QLabel("Results (max 100)"), row, 2)
-        grid.addWidget(self.nresults, row, 3)
-        row += 1
+        form = QWidget()
+        form_layout = QFormLayout(form)
+        form_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        form_layout.setFormAlignment(Qt.AlignLeft | Qt.AlignTop)
+        form_layout.setHorizontalSpacing(10)
+        form_layout.setVerticalSpacing(8)
+        form_layout.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+        form_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
 
-        grid.addWidget(QLabel("Year from"), row, 0)
-        grid.addWidget(self.start_year, row, 1)
-        grid.addWidget(QLabel("Year to"), row, 2)
-        grid.addWidget(self.end_year, row, 3)
-        row += 1
+        kw_lbl = QLabel("Keyword:")
+        kw_lbl.setBuddy(self.keyword)
+        form_layout.addRow(kw_lbl, self.keyword)
+        form_layout.addRow(QLabel(""), self.instructions)
 
-        grid.addWidget(QLabel("Language"), row, 0)
-        grid.addWidget(self.lang, row, 1)
-        grid.addWidget(QLabel("File type"), row, 2)
-        grid.addWidget(self.format, row, 3)
-        row += 1
+        quad = QWidget()
+        qg = QGridLayout(quad)
+        qg.setContentsMargins(0, 0, 0, 0)
+        qg.setHorizontalSpacing(12)
+        qg.setVerticalSpacing(8)
+        qg.setColumnStretch(1, 1)
+        qg.setColumnStretch(3, 1)
 
-        grid.addWidget(QLabel("Save as"), row, 0)
-        grid.addWidget(self.save_to, row, 1, 1, 2)
-        grid.addWidget(self.save_hint, row, 3)
+        lbl_sort = QLabel("Sort by:")
+        lbl_lang = QLabel("Language:")
+        lbl_res = QLabel("Results:")
+        lbl_ft = QLabel("File type:")
+        for lb in (lbl_sort, lbl_lang, lbl_res, lbl_ft):
+            lb.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        lbl_sort.setBuddy(self.sortby)
+        lbl_lang.setBuddy(self.lang)
+        lbl_res.setBuddy(self.nresults)
+        lbl_ft.setBuddy(self.format)
+
+        qg.addWidget(lbl_sort, 0, 0)
+        qg.addWidget(self.sortby, 0, 1)
+        qg.addWidget(lbl_lang, 0, 2)
+        qg.addWidget(self.lang, 0, 3)
+        qg.addWidget(lbl_res, 1, 0)
+        qg.addWidget(self.nresults, 1, 1)
+        qg.addWidget(lbl_ft, 1, 2)
+        qg.addWidget(self.format, 1, 3)
+        form_layout.addRow(QLabel(""), quad)
+
+        year_row = QWidget()
+        yh = QHBoxLayout(year_row)
+        yh.setContentsMargins(0, 0, 0, 0)
+        yh.setSpacing(10)
+        ly_from = QLabel("Year from:")
+        ly_to = QLabel("Year to:")
+        ly_from.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        ly_to.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        ly_from.setBuddy(self.start_year)
+        ly_to.setBuddy(self.end_year)
+        yh.addWidget(ly_from)
+        yh.addWidget(self.start_year)
+        yh.addSpacing(16)
+        yh.addWidget(ly_to)
+        yh.addWidget(self.end_year)
+        yh.addStretch(1)
+        form_layout.addRow(QLabel(""), year_row)
+
+        save_row = QWidget()
+        sh = QHBoxLayout(save_row)
+        sh.setContentsMargins(0, 0, 0, 0)
+        sh.setSpacing(8)
+        sh.addWidget(self.save_to, 1)
+        sh.addWidget(self.choose_folder_btn)
+        form_layout.addRow(QLabel("Save as:"), save_row)
+        form_layout.addRow(QLabel(""), self.save_hint)
+
+        appearance_wrap = QWidget()
+        appearance_layout = QHBoxLayout(appearance_wrap)
+        appearance_layout.setContentsMargins(0, 0, 0, 0)
+        appearance_layout.setSpacing(6)
+        appearance_layout.addWidget(self.theme_btn)
+        appearance_layout.addStretch(1)
+        form_layout.addRow(QLabel("Appearance:"), appearance_wrap)
 
         root.addWidget(form)
 
@@ -947,6 +1135,8 @@ class MainWindow(QMainWindow):
         self.table = QTableView()
         self.table.setModel(self.model)
         self.table.setAlternatingRowColors(True)
+        self.table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setSortingEnabled(False)
         self.table.clicked.connect(self._on_table_clicked)
@@ -958,10 +1148,10 @@ class MainWindow(QMainWindow):
         # This is safe: we check existence first and never overwrite anything.
         _maybe_create_desktop_shortcut()
         self._refresh_save_path()
+        self._apply_theme()
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
-        # No manual grip: resizing is edge-only for the frameless window.
 
     def _edge_bits_from_pos(self, pos) -> int:
         x = pos.x()
@@ -985,6 +1175,12 @@ class MainWindow(QMainWindow):
         return bits
 
     def mouseMoveEvent(self, event):  # noqa: N802
+        if self._manual_resize_edges is not None and self._resize_last_global is not None:
+            if event.buttons() & Qt.LeftButton:
+                self._manual_resize_step(event.globalPosition().toPoint())
+            event.accept()
+            return
+
         if self.isMaximized() or self.isFullScreen():
             return super().mouseMoveEvent(event)
 
@@ -1005,6 +1201,15 @@ class MainWindow(QMainWindow):
 
         return super().mouseMoveEvent(event)
 
+    def mouseReleaseEvent(self, event):  # noqa: N802
+        if event.button() == Qt.LeftButton and self._manual_resize_edges is not None:
+            self.releaseMouse()
+            self._manual_resize_edges = None
+            self._resize_last_global = None
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
     def mousePressEvent(self, event):  # noqa: N802
         if event.button() != Qt.LeftButton:
             return super().mousePressEvent(event)
@@ -1024,22 +1229,60 @@ class MainWindow(QMainWindow):
         ):
             return super().mousePressEvent(event)
 
-        handle = self.windowHandle()
-        if handle is not None:
-            qt_edges = Qt.Edge(0)
-            if edges & 1:
-                qt_edges |= Qt.Edge.LeftEdge
-            if edges & 2:
-                qt_edges |= Qt.Edge.RightEdge
-            if edges & 4:
-                qt_edges |= Qt.Edge.TopEdge
-            if edges & 8:
-                qt_edges |= Qt.Edge.BottomEdge
-            if qt_edges and handle.startSystemResize(qt_edges):
-                event.accept()
-                return True
+        qt_edges = Qt.Edge(0)
+        if edges & 1:
+            qt_edges |= Qt.Edge.LeftEdge
+        if edges & 2:
+            qt_edges |= Qt.Edge.RightEdge
+        if edges & 4:
+            qt_edges |= Qt.Edge.TopEdge
+        if edges & 8:
+            qt_edges |= Qt.Edge.BottomEdge
 
-        return super().mousePressEvent(event)
+        # En Windows, ventana sin marco: startSystemResize suele fallar o comportarse mal; usamos arrastre manual.
+        handle = self.windowHandle()
+        if (
+            not sys.platform.startswith("win")
+            and handle is not None
+            and qt_edges
+            and handle.startSystemResize(qt_edges)
+        ):
+            event.accept()
+            return True
+
+        self._manual_resize_edges = qt_edges
+        self._resize_last_global = event.globalPosition().toPoint()
+        self.grabMouse()
+        event.accept()
+        return True
+
+    def _manual_resize_step(self, global_pos: QPoint) -> None:
+        if self._manual_resize_edges is None or self._resize_last_global is None:
+            return
+        delta = global_pos - self._resize_last_global
+        self._resize_last_global = global_pos
+        g = self.geometry()
+        min_w, min_h = self.minimumWidth(), self.minimumHeight()
+        e = self._manual_resize_edges
+
+        if e & Qt.Edge.LeftEdge:
+            new_w = g.width() - delta.x()
+            if new_w >= min_w:
+                g.setLeft(g.left() + delta.x())
+                g.setWidth(new_w)
+        if e & Qt.Edge.RightEdge:
+            new_w = g.width() + delta.x()
+            g.setWidth(max(min_w, new_w))
+        if e & Qt.Edge.TopEdge:
+            new_h = g.height() - delta.y()
+            if new_h >= min_h:
+                g.setTop(g.top() + delta.y())
+                g.setHeight(new_h)
+        if e & Qt.Edge.BottomEdge:
+            new_h = g.height() + delta.y()
+            g.setHeight(max(min_h, new_h))
+
+        self.setGeometry(g)
 
     def _install_shortcuts(self) -> None:
         act = QAction(self)
@@ -1055,17 +1298,90 @@ class MainWindow(QMainWindow):
         keyword = (self.keyword.text() or "").strip()
         ext = self.format.currentText()
         base = _sanitize_filename(keyword) if keyword else "scholar_results"
-        out = Path.home() / "Downloads" / f"{base}.{ext}"
+        out = self._save_dir / f"{base}.{ext}"
         self.save_to.setText(str(out))
+        default_dir = Path.home() / "Downloads"
+        if self._save_dir == default_dir:
+            self.save_hint.setText("(Auto-saved to your Downloads folder)")
+        else:
+            self.save_hint.setText(f"(Auto-saved to: {self._save_dir})")
+
+    def _apply_theme(self) -> None:
+        self._pal = palette_for_mode(self._theme_mode)
+        QApplication.instance().setStyleSheet(qss(self._theme_mode))
+        for combo in (self.sortby, self.lang, self.format):
+            _make_combo_popup_opaque(combo, self._pal.field_bg)
+        self.titlebar.set_palette(self._pal)
+        self.model.apply_palette(self._pal)
+        if self._theme_mode == "dark":
+            self.theme_btn.setText("Switch to light mode")
+        else:
+            self.theme_btn.setText("Switch to dark mode")
+
+    def _toggle_theme(self) -> None:
+        self._theme_mode = "dark" if self._theme_mode == "light" else "light"
+        self._apply_theme()
+
+    def _choose_save_folder(self) -> None:
+        chosen = QFileDialog.getExistingDirectory(
+            self,
+            "Choose export folder",
+            str(self._save_dir),
+        )
+        if chosen:
+            self._save_dir = Path(chosen)
+            self._refresh_save_path()
 
     def _toggle_maximize(self) -> None:
-        self.setWindowState(self.windowState() ^ Qt.WindowMaximized)
+        new_state = self.windowState() ^ Qt.WindowState.WindowMaximized
+        self.setWindowState(new_state)
+        if not (new_state & Qt.WindowState.WindowMaximized):
+            _windows_native_clear_maximized(self)
+            QApplication.processEvents()
+
+    def _restore_centered_window(self) -> None:
+        """Green control: salir de maximizado real de Windows y centrar la ventana."""
+        self.setWindowState(Qt.WindowState.WindowNoState)
+        self.showNormal()
+        _windows_native_clear_maximized(self)
+        QApplication.processEvents()
+        QTimer.singleShot(0, self._apply_restore_size)
+
+    def _apply_restore_size(self) -> None:
+        _windows_native_clear_maximized(self)
+        self.setWindowState(Qt.WindowState.WindowNoState)
+        self.showNormal()
+        QApplication.processEvents()
+
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            return
+        avail = screen.availableGeometry()
+        mw, mh = self.minimumWidth(), self.minimumHeight()
+        w = max(mw, min(1040, avail.width() - 48))
+        h = max(mh, min(720, avail.height() - 48))
+        x = avail.x() + max(0, (avail.width() - w) // 2)
+        y = avail.y() + max(0, (avail.height() - h) // 2)
+        self.setGeometry(QRect(x, y, w, h))
+        # Si el SO aún ignora el tamaño, un segundo intento tras un frame.
+        if self.width() != w or self.height() != h:
+            QTimer.singleShot(50, lambda: self._retry_restore_if_stuck(w, h, x, y))
+        self.raise_()
+        self.activateWindow()
+
+    def _retry_restore_if_stuck(self, w: int, h: int, x: int, y: int) -> None:
+        _windows_native_clear_maximized(self)
+        QApplication.processEvents()
+        self.setGeometry(QRect(x, y, w, h))
 
     def _toggle_fullscreen(self) -> None:
-        if self.isFullScreen():
+        # Keep taskbar visible: use maximize toggle instead of true fullscreen.
+        if self.isMaximized():
             self.showNormal()
+            _windows_native_clear_maximized(self)
+            QApplication.processEvents()
         else:
-            self.showFullScreen()
+            self.showMaximized()
 
     def _on_table_clicked(self, index: QModelIndex) -> None:
         try:
@@ -1171,8 +1487,17 @@ class MainWindow(QMainWindow):
 def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
-    app.setStyleSheet(qss())
+    # Fusion makes combo popups follow QSS instead of semi-transparent native menus (esp. Windows).
+    fusion = QStyleFactory.create("Fusion")
+    if fusion is not None:
+        app.setStyle(fusion)
+    app.setStyleSheet(qss("light"))
     w = MainWindow()
+    # No usar showMaximized() con ventana sin marco en Windows: deja WS_MAXIMIZE y
+    # setGeometry deja de funcionar (pantalla completa “pegada”). Misma apariencia:
+    sc = QApplication.primaryScreen()
+    if sc is not None:
+        w.setGeometry(sc.availableGeometry())
     w.show()
     return app.exec()
 
