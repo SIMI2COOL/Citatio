@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Citatio — Descargar</title>
+  <meta name="description" content="Descarga Citatio para Windows. Encuentra y exporta los artículos más citados." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a222c;
+      --text: #e8eef4;
+      --muted: #8b9aad;
+      --accent: #3d8bfd;
+      --accent-hover: #5ca0ff;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "DM Sans", system-ui, sans-serif;
+      background: radial-gradient(ellipse 120% 80% at 50% -20%, #1e3a5f 0%, var(--bg) 55%);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .wrap {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 4rem;
+    }
+    .logo {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      background: linear-gradient(145deg, #2a3f5c, #1a2838);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    h1 {
+      font-size: 1.85rem;
+      font-weight: 700;
+      margin: 0 0 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    .tagline {
+      color: var(--muted);
+      font-size: 1.05rem;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      border: 1px solid rgba(255,255,255,.06);
+      box-shadow: 0 20px 50px rgba(0,0,0,.25);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 1rem 1.25rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .2s, transform .15s;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled {
+      opacity: .55;
+      cursor: wait;
+      transform: none;
+    }
+    .secondary {
+      display: block;
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .secondary a { color: var(--accent); }
+    .note {
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255,255,255,.08);
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .err {
+      color: #ff8a8a;
+      font-size: 0.9rem;
+      margin-top: 1rem;
+    }
+    footer {
+      margin-top: 3rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo" aria-hidden="true">🔍</div>
+    <h1>Citatio</h1>
+    <p class="tagline">Los artículos más citados sobre cualquier tema. Exporta a CSV o Excel.</p>
+
+    <div class="card">
+      <a id="download-btn" class="btn" href="#" role="button">Descargar para Windows</a>
+      <p id="version-hint" class="secondary" style="display:none;"></p>
+      <a class="secondary" id="releases-link" href="https://github.com/SIMI2COOL/Citatio/releases/latest" target="_blank" rel="noopener">Ver todas las versiones en GitHub</a>
+      <p id="error-msg" class="err" style="display:none;"></p>
+      <p class="note">
+        Windows puede mostrar un aviso de “editor desconocido” la primera vez. Es normal si aún no firmas el programa con un certificado oficial. Elige “Más información” y luego “Ejecutar de todas formas” si aparece.
+      </p>
+    </div>
+
+    <footer>Citatio · SIMI2COOL</footer>
+  </div>
+
+  <script>
+    (function () {
+      var btn = document.getElementById("download-btn");
+      var hint = document.getElementById("version-hint");
+      var err = document.getElementById("error-msg");
+      var releases = "https://github.com/SIMI2COOL/Citatio/releases/latest";
+
+      btn.href = releases;
+      btn.textContent = "Buscando la última versión…";
+      btn.setAttribute("aria-busy", "true");
+
+      fetch("https://api.github.com/repos/SIMI2COOL/Citatio/releases/latest")
+        .then(function (r) {
+          if (!r.ok) throw new Error("No se pudo cargar la última versión.");
+          return r.json();
+        })
+        .then(function (data) {
+          var assets = data.assets || [];
+          var exe = assets.find(function (a) {
+            return /^Citatio-Setup-.+\.exe$/i.test(a.name);
+          });
+          if (exe && exe.browser_download_url) {
+            btn.href = exe.browser_download_url;
+            btn.textContent = "Descargar para Windows";
+            btn.removeAttribute("aria-busy");
+            if (data.tag_name) {
+              hint.textContent = "Versión: " + data.tag_name;
+              hint.style.display = "block";
+            }
+          } else {
+            btn.href = releases;
+            btn.textContent = "Ir a la página de descarga";
+            btn.removeAttribute("aria-busy");
+            err.textContent = "No encontré el instalador en esta versión. Usa el enlace de GitHub abajo.";
+            err.style.display = "block";
+          }
+        })
+        .catch(function () {
+          btn.href = releases;
+          btn.textContent = "Ir a la página de descarga";
+          btn.removeAttribute("aria-busy");
+          err.textContent = "No pude conectar con GitHub. Abre el enlace de abajo para descargar.";
+          err.style.display = "block";
+        });
+    })();
+  </script>
+</body>
+</html>

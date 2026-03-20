@@ -263,6 +263,21 @@ It automatically:
 Then share this link:
 `https://github.com/<your-username>/Citatio/releases/latest`
 
+### Nice download page (free, on GitHub)
+
+The repo includes a simple landing page at `docs/index.html` with a big **Download for Windows** button. It automatically points to the latest `Citatio-Setup-*.exe` from GitHub Releases.
+
+**Turn it on once:**
+
+1. On GitHub, open your repository -> **Settings** -> **Pages** (in the left sidebar).
+2. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
+3. **Branch**: choose `dev` (or your default branch) and folder **`/docs`**, then **Save**.
+4. After a minute, your page will be live at:
+   - `https://SIMI2COOL.github.io/Citatio/`  
+   (If your username or repo name changes, GitHub shows the exact URL on the Pages settings screen.)
+
+You only publish new app versions the same way as before (new release tag). The landing page keeps working without editing the HTML each time.
+
 ## Search tips ✨
 
 Inside the app you can use:
