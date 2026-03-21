@@ -46,26 +46,24 @@
       min-height: 100vh;
       padding: var(--header-h) 0 var(--taskbar-h);
       font-family: Chicago, Geneva, "Helvetica Neue", Tahoma, "MS Sans Serif", sans-serif;
-      font-size: 12px;
+      font-size: 14px;
       color: var(--text);
       background: var(--surface);
       line-height: 1.45;
       overflow-x: hidden;
     }
 
-    /* Simple raised frame: one bevel + soft outer shadow (middle band only) */
+    /* Full-page frame: wraps entire viewport (header, content, taskbar); clicks pass through */
     .page-bevel {
       position: fixed;
-      top: var(--header-h);
-      bottom: var(--taskbar-h);
-      left: 0;
-      right: 0;
+      inset: 0;
       pointer-events: none;
-      z-index: 4;
+      z-index: 9999;
       box-shadow:
-        0 8px 24px rgba(0, 0, 0, 0.12),
-        inset 2px 2px 0 var(--highlight),
-        inset -2px -2px 0 var(--dark-shadow);
+        0 12px 40px rgba(0, 0, 0, 0.14),
+        inset 0 0 0 1px var(--edge),
+        inset 3px 3px 0 var(--highlight),
+        inset -3px -3px 0 var(--dark-shadow);
     }
 
     #rainbowHeader {
@@ -86,7 +84,7 @@
       width: 100%;
     }
 
-    /* Title: 100px, light fill cut by many thin horizontal black lines */
+    /* Title: 100px, thicker dark horizontal bands (reads darker overall) */
     .citatio-title {
       position: absolute;
       top: 12px;
@@ -101,10 +99,10 @@
       letter-spacing: 0.02em;
       background: repeating-linear-gradient(
         180deg,
-        #ececec 0px,
-        #ececec 2px,
-        #141414 2px,
-        #141414 3px
+        #d8d8d8 0px,
+        #d8d8d8 4px,
+        #0a0a0a 4px,
+        #0a0a0a 9px
       );
       -webkit-background-clip: text;
       background-clip: text;
@@ -141,7 +139,7 @@
     #downloadWindow {
       position: fixed;
       z-index: 25;
-      width: min(92vw, 480px);
+      width: min(96vw, 700px);
       left: 0;
       top: 0;
       will-change: left, top;
@@ -158,8 +156,9 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
-      padding: 4px 5px 4px 8px;
+      gap: 10px;
+      padding: 8px 10px 8px 12px;
+      min-height: 44px;
       background: linear-gradient(180deg, #e8e8e8 0%, #b0b0b0 48%, #909090 100%);
       border-bottom: 2px solid var(--dark-shadow);
       user-select: none;
@@ -174,8 +173,8 @@
     }
 
     .title-logo {
-      width: 22px;
-      height: 22px;
+      width: 30px;
+      height: 30px;
       flex-shrink: 0;
       image-rendering: pixelated;
       object-fit: contain;
@@ -183,7 +182,7 @@
     }
 
     .title-text {
-      font-size: 12px;
+      font-size: 16px;
       font-weight: 700;
       color: #111;
       text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.45);
@@ -200,10 +199,10 @@
     }
 
     .title-btn {
-      width: 18px;
-      height: 18px;
+      width: 24px;
+      height: 24px;
       padding: 0;
-      font-size: 11px;
+      font-size: 14px;
       line-height: 1;
       color: #000;
       background: var(--chrome);
@@ -222,7 +221,7 @@
     }
 
     .win-body {
-      padding: 12px 12px 14px;
+      padding: 20px 22px 22px;
       background: var(--surface);
       border: 2px solid;
       border-color: var(--dark-shadow) var(--highlight) var(--highlight) var(--dark-shadow);
@@ -231,23 +230,24 @@
 
     .hero-logo {
       display: block;
-      width: 48px;
-      height: 48px;
-      margin: 0 auto 10px;
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 14px;
       image-rendering: pixelated;
       object-fit: contain;
     }
 
     .blurb {
-      margin: 0 0 10px;
-      font-size: 12px;
+      margin: 0 0 14px;
+      font-size: 17px;
+      line-height: 1.5;
       color: var(--text);
     }
 
     .version-line {
-      font-size: 12px;
+      font-size: 16px;
       color: var(--text-muted);
-      margin: 0 0 10px;
+      margin: 0 0 14px;
     }
 
     .version-line strong {
@@ -259,10 +259,10 @@
       align-items: center;
       justify-content: center;
       width: 100%;
-      min-height: 26px;
-      padding: 4px 10px;
+      min-height: 44px;
+      padding: 10px 18px;
       font-family: inherit;
-      font-size: 12px;
+      font-size: 17px;
       color: var(--text);
       text-decoration: none;
       background: var(--chrome);
@@ -276,10 +276,10 @@
 
     .win-btn:active:not(:disabled) {
       border-color: var(--dark-shadow) var(--highlight) var(--highlight) var(--dark-shadow);
-      padding-top: 5px;
-      padding-left: 11px;
-      padding-bottom: 3px;
-      padding-right: 9px;
+      padding-top: 11px;
+      padding-left: 19px;
+      padding-bottom: 9px;
+      padding-right: 17px;
     }
 
     .win-btn:disabled {
@@ -289,8 +289,9 @@
 
     .err {
       color: #a00000;
-      font-size: 12px;
-      margin-top: 8px;
+      font-size: 15px;
+      margin-top: 12px;
+      line-height: 1.45;
     }
 
     .taskbar {
@@ -307,7 +308,7 @@
       background: var(--chrome);
       border-top: 2px solid;
       border-color: var(--highlight) var(--dark-shadow) var(--dark-shadow) var(--highlight);
-      font-size: 12px;
+      font-size: 14px;
       color: var(--text);
     }
 
@@ -318,7 +319,7 @@
 
     .taskbar-clock {
       font-family: "Lucida Console", Monaco, monospace;
-      font-size: 12px;
+      font-size: 14px;
       padding: 2px 10px;
       background: var(--surface);
       border: 2px solid;
@@ -331,7 +332,6 @@
 </head>
 <body>
   <canvas id="rainbowHeader" width="800" height="52" aria-hidden="true"></canvas>
-  <div class="page-bevel" aria-hidden="true"></div>
 
   <div class="content-stage">
     <h1 class="citatio-title">Citatio</h1>
@@ -343,7 +343,7 @@
     <div class="win-outer">
       <div class="title-bar" id="titleBar">
         <div class="title-with-logo">
-          <img class="title-logo" src="logo.ico" width="22" height="22" alt="" />
+          <img class="title-logo" src="logo.ico" width="30" height="30" alt="" />
           <span class="title-text" id="win-title">Citatio — Download</span>
         </div>
         <div class="title-controls">
@@ -353,7 +353,7 @@
         </div>
       </div>
       <div class="win-body">
-        <img class="hero-logo" src="logo.ico" width="48" height="48" alt="Citatio" />
+        <img class="hero-logo" src="logo.ico" width="80" height="80" alt="Citatio" />
         <p class="blurb">
           Find and rank the most-cited papers on any topic (Google Scholar). Export clean results to <strong>CSV</strong> or <strong>Excel</strong>.
         </p>
@@ -368,6 +368,8 @@
     <span class="taskbar-credit">Made by Teo Simon Untroib</span>
     <span class="taskbar-clock" id="clock" aria-live="polite">00:00:00</span>
   </footer>
+
+  <div class="page-bevel" aria-hidden="true"></div>
 
   <script>
     (function () {
@@ -626,7 +628,7 @@
             dl.href = fallback;
             dl.textContent = "Open download page";
             dl.removeAttribute("aria-busy");
-            err.textContent = "Installer .exe not found for this release. Use the GitHub link below.";
+            err.textContent = "Installer .exe not found for this release. Open the Citatio repository on GitHub and check Releases.";
             err.style.display = "block";
             verLine.innerHTML = "Version <strong>" + (data.tag_name || defaultVer) + "</strong>";
           }
@@ -636,7 +638,7 @@
           dl.textContent = "Open download page";
           dl.removeAttribute("aria-busy");
           verLine.innerHTML = "Version <strong>" + defaultVer + "</strong>";
-          err.textContent = "Could not reach GitHub. Use the link below.";
+          err.textContent = "Could not reach GitHub. Try again later or open the repository in your browser.";
           err.style.display = "block";
         });
     })();
