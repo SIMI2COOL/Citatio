@@ -247,7 +247,7 @@ You can publish Citatio so people download it from a web page, without cloning t
 This repository includes GitHub Actions workflows:
 
 - `.github/workflows/release-windows.yml` — builds `Citatio.exe`, runs Inno Setup, attaches **`Citatio-Setup-<version>.exe`** to the release.
-- `.github/workflows/release-linux.yml` — builds the Linux PyInstaller binary and attaches **`Citatio-Linux-<version>.tar.gz`** (extract and run `./Citatio`; use `chmod +x` if needed).
+- `.github/workflows/release-linux.yml` — builds the Linux PyInstaller binary and attaches **`Citatio-Linux-<version>.tar.gz`** (users extract it and open **Citatio**; the OS may ask to allow running the app).
 
 Both run when you **publish** a GitHub Release (same tag, e.g. `v1.0.6`).
 
