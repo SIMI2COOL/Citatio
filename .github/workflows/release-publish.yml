@@ -1,9 +1,9 @@
 # =============================================================================
 # Se ejecuta al PUBLICAR una release (tag v1.0.8, etc.), o manualmente desde Actions.
 #
-# Si no ves ningún run: GitHub solo usa la rama POR DEFECTO del repo para este evento.
-#   Settings → General → Default branch → si trabajás en `dev`, poné **dev** como default
-#   (no hace falta usar `main` si no la usás).
+# GitHub ejecuta este workflow según la rama por defecto del repo (aquí: **dev**).
+# Si no corre al publicar un release, comprobá que este archivo exista en `dev` y que el tag
+# del release apunte a un commit que tenga el workflow.
 #
 # “Run workflow” solo sube artefactos de prueba; no adjunta al release.
 # =============================================================================

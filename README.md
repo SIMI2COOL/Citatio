@@ -256,7 +256,7 @@ This repository includes one GitHub Actions workflow:
 4. Wait for the **Release — Windows installer + Linux tarball** workflow to finish (**Actions** tab). It shows two jobs: **Windows (.exe)** and **Linux (.tar.gz)**.
 5. The release should list **`Citatio-Setup-<version>.exe`** and **`Citatio-Linux-<version>.tar.gz`**.
 
-**Si no arranca ningún Action:** GitHub exige que el workflow esté en la **rama por defecto** del repositorio. Si tu rama habitual es **`dev`**, en GitHub abrí **Settings → General → Default branch** y cambiá el default a **`dev`** (así no tenés que fusionar a `main` si no la usás). Luego volvé a publicar la release.
+**Si no arranca ningún Action:** comprobá en **Settings → General** que la rama por defecto sea la que usás (en este proyecto suele ser **`dev`**) y que `.github/workflows/release-publish.yml` esté en esa rama. El tag de la release debe apuntar a un commit que incluya ese archivo.
 
 Then share this link:
 `https://github.com/<your-username>/Citatio/releases/latest`
