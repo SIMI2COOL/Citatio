@@ -11,7 +11,7 @@ Download buttons use **`dl-icon-windows.svg`** (Windows XP–style mark from you
 
 ### Link preview (WhatsApp, etc.)
 
-`index.html` includes Open Graph tags pointing at **`og-image.png`** (in this folder). Replace `website/og-image.png` with your own screenshot (~**1200×630** looks best) if you want a branded preview; then redeploy Vercel.
+`index.html` sets **`og:title` / Twitter title** to **Citatio** (not “Citatio — Download”), **`og:description`** to the one-line app pitch (Scholar + CSV/Excel), and **`og-image.png`** as the preview image. After changing the PNG, bump the `?v=` query on the `og:image` / `twitter:image` URLs in `index.html` so caches refresh. WhatsApp can take a while to update; the [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) can help force a rescrape.
 
 ## Deploy on Vercel
 
