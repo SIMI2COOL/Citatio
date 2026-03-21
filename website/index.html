@@ -94,18 +94,21 @@
       - --title-stripe-width: thickness of each black line (try 1px–4px; too high looks “solid”)
     */
     .citatio-title {
-      --title-stripe-gap: 12px;
-      --title-stripe-width: 1px;
-      position: absolute;
-      top: 12px;
-      left: 20px;
+      --title-stripe-gap: 6.4px;
+      --title-stripe-width: 8px;
+      position: fixed;
+      left: 0;
+      top: 0;
       margin: 0;
-      z-index: 20;
+      z-index: 24;
+      width: max-content;
+      max-width: calc(100vw - 2 * var(--bevel-frame));
+      pointer-events: none;
       font-family: Chicago, Geneva, "Helvetica Neue", Tahoma, "MS Sans Serif", sans-serif;
       font-size: 100px;
       font-weight: 600;
       line-height: 1.05;
-      text-align: left;
+      text-align: center;
       letter-spacing: 0.02em;
       color: transparent;
       -webkit-text-fill-color: transparent;
@@ -155,11 +158,38 @@
       will-change: left, top;
     }
 
+    /* Bevel stack like page — on ::after so edge lines sit on top of chrome (pointer-events: none) */
     .win-outer {
-      border: 2px solid;
-      border-color: var(--highlight) var(--dark-shadow) var(--dark-shadow) var(--highlight);
-      box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.18);
+      position: relative;
+      border: none;
       background: var(--chrome);
+    }
+
+    .win-outer::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+      box-shadow:
+        inset 1px 1px 0 var(--highlight),
+        inset -1px -1px 0 var(--dark-shadow),
+        inset 2px 2px 0 var(--highlight),
+        inset -2px -2px 0 var(--bevel-inner),
+        inset 3px 3px 0 var(--bevel-inner),
+        inset -3px -3px 0 var(--dark-shadow),
+        inset 4px 4px 0 var(--highlight),
+        inset -4px -4px 0 var(--bevel-inner),
+        inset 5px 5px 0 var(--bevel-inner),
+        inset -5px -5px 0 var(--dark-shadow),
+        inset 6px 6px 0 var(--highlight),
+        inset -6px -6px 0 var(--dark-shadow);
+    }
+
+    .title-bar,
+    .win-body {
+      position: relative;
+      z-index: 1;
     }
 
     .title-bar {
@@ -169,7 +199,7 @@
       gap: 10px;
       padding: 8px 10px 8px 12px;
       min-height: 44px;
-      background: linear-gradient(180deg, #e8e8e8 0%, #b0b0b0 48%, #909090 100%);
+      background: var(--chrome);
       border-bottom: 2px solid var(--dark-shadow);
       user-select: none;
       cursor: move;
@@ -343,9 +373,9 @@
 <body>
   <canvas id="rainbowHeader" width="800" height="52" aria-hidden="true"></canvas>
 
-  <div class="content-stage">
-    <h1 class="citatio-title">Citatio</h1>
-  </div>
+  <div class="content-stage"></div>
+
+  <h1 class="citatio-title" id="citatioTitle">Citatio</h1>
 
   <div id="trailLayer" aria-hidden="true"></div>
 
@@ -496,7 +526,9 @@
       /* --- Draggable window with lag + fading trail --- */
       var winEl = document.getElementById("downloadWindow");
       var titleBar = document.getElementById("titleBar");
+      var titleEl = document.getElementById("citatioTitle");
       var trailLayer = document.getElementById("trailLayer");
+      var TITLE_GAP = 16;
       var HEADER = BEVEL + 52;
       var TASKBAR = BEVEL + 32;
 
@@ -533,9 +565,22 @@
         applyPos();
       }
 
+      function updateTitlePosition() {
+        if (!titleEl || !winEl) return;
+        var rw = winEl.offsetWidth;
+        var th = titleEl.offsetHeight || 105;
+        var cx = curX + rw / 2;
+        var desiredTop = curY - th - TITLE_GAP;
+        var minTop = HEADER + 6;
+        titleEl.style.left = Math.round(cx) + "px";
+        titleEl.style.top = Math.round(Math.max(minTop, desiredTop)) + "px";
+        titleEl.style.transform = "translateX(-50%)";
+      }
+
       function applyPos() {
         winEl.style.left = Math.round(curX) + "px";
         winEl.style.top = Math.round(curY) + "px";
+        updateTitlePosition();
       }
 
       function spawnTrail() {
@@ -623,6 +668,9 @@
       } else {
         centerWindow();
       }
+      requestAnimationFrame(function () {
+        requestAnimationFrame(updateTitlePosition);
+      });
       requestAnimationFrame(animLoop);
 
       /* --- Clock, fake title buttons, download API, boot beep --- */
