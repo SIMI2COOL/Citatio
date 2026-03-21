@@ -301,6 +301,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      gap: 12px;
       width: 100%;
       min-height: 44px;
       padding: 10px 18px;
@@ -325,6 +326,15 @@
       padding-right: 17px;
     }
 
+    .dl-btn-icon {
+      flex-shrink: 0;
+      display: block;
+      width: 26px;
+      height: 26px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
     .win-btn:disabled {
       color: var(--edge);
       cursor: wait;
@@ -335,21 +345,6 @@
       flex-direction: column;
       gap: 10px;
       margin-top: 2px;
-    }
-
-    .linux-hint {
-      margin: 10px 0 0;
-      font-size: 13px;
-      line-height: 1.45;
-      color: var(--text-muted);
-    }
-
-    .linux-hint code {
-      font-family: "Lucida Console", Monaco, monospace;
-      font-size: 12px;
-      background: var(--field);
-      padding: 1px 5px;
-      border: 1px solid var(--light-edge);
     }
 
     .err {
@@ -421,12 +416,31 @@
         <img class="hero-logo" src="logo.ico" width="80" height="80" alt="Citatio" />
         <p class="version-line" id="ver-line">Version <strong>v1.0.6</strong></p>
         <div class="dl-actions">
-          <a id="dl-win" class="win-btn" href="https://github.com/SIMI2COOL/Citatio/releases/latest">Checking latest version…</a>
-          <a id="dl-linux" class="win-btn" href="https://github.com/SIMI2COOL/Citatio/releases/latest">Checking latest version…</a>
+          <a id="dl-win" class="win-btn" href="https://github.com/SIMI2COOL/Citatio/releases/latest">
+            <!-- Classic 4-pane Windows-style mark (retro, not an official trademark reproduction) -->
+            <svg class="dl-btn-icon" viewBox="0 0 16 16" width="26" height="26" aria-hidden="true">
+              <rect x="0.5" y="0.5" width="6" height="6" fill="#e14b3b" stroke="#1a1a1a" stroke-width="1" />
+              <rect x="9.5" y="0.5" width="6" height="6" fill="#6bb85a" stroke="#1a1a1a" stroke-width="1" />
+              <rect x="0.5" y="9.5" width="6" height="6" fill="#4a9fd8" stroke="#1a1a1a" stroke-width="1" />
+              <rect x="9.5" y="9.5" width="6" height="6" fill="#f0c040" stroke="#1a1a1a" stroke-width="1" />
+            </svg>
+            <span id="dl-win-label">Checking latest version…</span>
+          </a>
+          <a id="dl-linux" class="win-btn" href="https://github.com/SIMI2COOL/Citatio/releases/latest">
+            <svg class="dl-btn-icon" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
+              <ellipse cx="16" cy="22" rx="11" ry="9" fill="#1a1a1a" />
+              <ellipse cx="16" cy="23" rx="6" ry="5" fill="#f2f2f2" />
+              <circle cx="16" cy="10" r="8.5" fill="#1a1a1a" />
+              <ellipse cx="16" cy="11" rx="5.5" ry="4.5" fill="#f2f2f2" />
+              <circle cx="13" cy="10" r="1.4" fill="#0d0d0d" />
+              <circle cx="19" cy="10" r="1.4" fill="#0d0d0d" />
+              <path d="M14 13.5 L18 13.5 L16 16.5 Z" fill="#e8a020" />
+              <ellipse cx="11.5" cy="28.5" rx="3.5" ry="2" fill="#e8a020" />
+              <ellipse cx="20.5" cy="28.5" rx="3.5" ry="2" fill="#e8a020" />
+            </svg>
+            <span id="dl-linux-label">Checking latest version…</span>
+          </a>
         </div>
-        <p class="linux-hint">
-          <strong>Linux:</strong> download the file, open it to extract the folder, then double‑click <strong>Citatio</strong> to launch. If your system asks whether you trust the app, choose <strong>Allow</strong> or <strong>Run anyway</strong> so it can open.
-        </p>
         <p id="err" class="err" style="display:none;"></p>
       </div>
     </div>
@@ -732,6 +746,8 @@
 
       var dlWin = document.getElementById("dl-win");
       var dlLinux = document.getElementById("dl-linux");
+      var dlWinLabel = document.getElementById("dl-win-label");
+      var dlLinuxLabel = document.getElementById("dl-linux-label");
       var verLine = document.getElementById("ver-line");
       var err = document.getElementById("err");
       var fallback = "https://github.com/SIMI2COOL/Citatio/releases/latest";
@@ -749,8 +765,8 @@
 
       dlWin.href = fallback;
       dlLinux.href = fallback;
-      dlWin.textContent = "Checking latest version…";
-      dlLinux.textContent = "Checking latest version…";
+      dlWinLabel.textContent = "Checking latest version…";
+      dlLinuxLabel.textContent = "Checking latest version…";
       setBusy(true);
 
       fetch("https://api.github.com/repos/SIMI2COOL/Citatio/releases/latest")
@@ -773,21 +789,21 @@
           if (exe && exe.browser_download_url) {
             dlWin.href = exe.browser_download_url;
             dlWin.setAttribute("download", exe.name);
-            dlWin.textContent = "Download for Windows";
+            dlWinLabel.textContent = "Download for Windows";
           } else {
             dlWin.href = fallback;
             dlWin.removeAttribute("download");
-            dlWin.textContent = "Open download page (Windows)";
+            dlWinLabel.textContent = "Open download page (Windows)";
           }
 
           if (linux && linux.browser_download_url) {
             dlLinux.href = linux.browser_download_url;
             dlLinux.setAttribute("download", linux.name);
-            dlLinux.textContent = "Download for Linux (.tar.gz)";
+            dlLinuxLabel.textContent = "Download for Linux";
           } else {
             dlLinux.href = fallback;
             dlLinux.removeAttribute("download");
-            dlLinux.textContent = "Linux build on GitHub Releases";
+            dlLinuxLabel.textContent = "Linux build on GitHub Releases";
           }
 
           setBusy(false);
@@ -810,8 +826,8 @@
           dlLinux.href = fallback;
           dlWin.removeAttribute("download");
           dlLinux.removeAttribute("download");
-          dlWin.textContent = "Open download page";
-          dlLinux.textContent = "Open download page";
+          dlWinLabel.textContent = "Open download page";
+          dlLinuxLabel.textContent = "Open download page";
           setBusy(false);
           verLine.innerHTML = "Version <strong>" + defaultVer + "</strong>";
           err.textContent = "Could not reach GitHub. Try again later or open the repository in your browser.";
