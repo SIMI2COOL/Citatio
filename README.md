@@ -262,6 +262,21 @@ Both run when you **publish** a GitHub Release (same tag, e.g. `v1.0.6`).
 Then share this link:
 `https://github.com/<your-username>/Citatio/releases/latest`
 
+### Windows: orange screen “Windows protected your PC” (SmartScreen)
+
+That screen appears because Windows does not yet **trust** the program the way it trusts apps from the Microsoft Store or big publishers. It is normal for a new or small app.
+
+**What actually removes (or greatly reduces) that warning**
+
+1. **Sign the installer with a code-signing certificate** from a well-known authority (you buy one yearly; search for “Authenticode code signing certificate”). After you sign `Citatio-Setup-….exe` (and ideally `Citatio.exe` too), SmartScreen treats the file more like “real” software. Over time, as more people install it, **reputation** improves and the warning often appears less.
+2. There is **no secret setting in the project** that makes the orange screen disappear for everyone without signing. Microsoft designed it that way on purpose.
+
+**What does *not* replace signing**
+
+- Telling users to click **More info → Run anyway** is only a workaround; the scary screen still shows first.
+
+The installer is set to **`PrivilegesRequired=lowest`** (no admin prompt) and creates the optional desktop shortcut on **your own desktop** (`{userdesktop}`), not the “All users” public desktop—so you should not see **“IPersistFile::Save failed … Access is denied”** when creating the shortcut anymore.
+
 ### Nice download page (free, on GitHub)
 
 The repo includes a simple landing page at `docs/index.html` with a big **Download for Windows** button. It automatically points to the latest `Citatio-Setup-*.exe` from GitHub Releases.
