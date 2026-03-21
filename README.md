@@ -244,19 +244,16 @@ You can publish Citatio so people download it from a web page, without cloning t
 
 ### One-time setup
 
-This repository includes GitHub Actions workflows:
+This repository includes one GitHub Actions workflow:
 
-- `.github/workflows/release-windows.yml` — builds `Citatio.exe`, runs Inno Setup, attaches **`Citatio-Setup-<version>.exe`** to the release.
-- `.github/workflows/release-linux.yml` — builds the Linux PyInstaller binary and attaches **`Citatio-Linux-<version>.tar.gz`** (users extract it and open **Citatio**; the OS may ask to allow running the app).
-
-Both run when you **publish** a GitHub Release (same tag, e.g. `v1.0.6`).
+- `.github/workflows/release-publish.yml` — when you **publish** a release, it runs **two jobs in parallel**: Windows (`Citatio-Setup-<version>.exe`) and Linux (`Citatio-Linux-<version>.tar.gz`). You can also run it manually from the **Actions** tab (**Run workflow**).
 
 ### How to publish each app version
 
 1. Open your GitHub repository in the browser.
 2. Go to **Releases** → **Draft a new release**.
 3. Create a tag like `v1.0.6` (or `v1.0.0`) and publish the release.
-4. Wait for **both** workflows to finish (**Actions** tab): one Windows job and one Linux job.
+4. Wait for the **Release — Windows installer + Linux tarball** workflow to finish (**Actions** tab). It shows two jobs: **Windows (.exe)** and **Linux (.tar.gz)**.
 5. The release should list **`Citatio-Setup-<version>.exe`** and **`Citatio-Linux-<version>.tar.gz`**.
 
 Then share this link:

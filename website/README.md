@@ -5,7 +5,7 @@ Single static page in **English**: platinum grey UI matching the desktop app (`t
 The page loads the latest release from GitHub and wires:
 
 - **Windows** → `Citatio-Setup-*.exe`
-- **Linux** → `Citatio-Linux-*.tar.gz` (produced by `.github/workflows/release-linux.yml`)
+- **Linux** → `Citatio-Linux-*.tar.gz` (built by `.github/workflows/release-publish.yml` when you publish a release)
 
 Download buttons use **`dl-icon-windows.svg`** (Windows XP–style mark from your Icons8 asset) and **`dl-icon-linux.svg`** (Tux artwork). If Icons8’s license for your account asks for attribution, add it in the page footer or here in the docs.
 
