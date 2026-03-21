@@ -53,7 +53,7 @@
       overflow-x: hidden;
     }
 
-    /* App-style bevel on the middle band only — does not cover rainbow header or taskbar */
+    /* Simple raised frame: one bevel + soft outer shadow (middle band only) */
     .page-bevel {
       position: fixed;
       top: var(--header-h);
@@ -63,46 +63,9 @@
       pointer-events: none;
       z-index: 4;
       box-shadow:
-        inset 1px 1px 0 0 var(--highlight),
-        inset -1px -1px 0 0 var(--bevel-shadow),
-        inset 2px 2px 0 0 var(--highlight),
-        inset -2px -2px 0 0 var(--bevel-inner),
-        inset 3px 3px 0 0 var(--highlight),
-        inset -3px -3px 0 0 var(--bevel-inner),
-        inset 4px 4px 0 0 var(--highlight),
-        inset -4px -4px 0 0 var(--bevel-shadow),
-        inset 5px 5px 0 0 var(--bevel-inner),
-        inset -5px -5px 0 0 var(--bevel-inner),
-        inset 6px 6px 0 0 var(--bevel-inner),
-        inset -6px -6px 0 0 var(--bevel-shadow),
-        inset 7px 7px 0 0 var(--highlight),
-        inset -7px -7px 0 0 var(--bevel-shadow),
-        inset 8px 8px 0 0 var(--bevel-inner),
-        inset -8px -8px 0 0 var(--bevel-inner),
-        inset 9px 9px 0 0 var(--highlight),
-        inset -9px -9px 0 0 var(--bevel-shadow),
-        inset 10px 10px 0 0 var(--bevel-inner),
-        inset -10px -10px 0 0 var(--bevel-inner),
-        inset 11px 11px 0 0 var(--highlight),
-        inset -11px -11px 0 0 var(--bevel-shadow),
-        inset 12px 12px 0 0 var(--bevel-inner),
-        inset -12px -12px 0 0 var(--bevel-inner),
-        inset 13px 13px 0 0 var(--highlight),
-        inset -13px -13px 0 0 var(--bevel-shadow),
-        inset 14px 14px 0 0 var(--bevel-inner),
-        inset -14px -14px 0 0 var(--bevel-inner),
-        inset 15px 15px 0 0 var(--highlight),
-        inset -15px -15px 0 0 var(--bevel-shadow),
-        inset 16px 16px 0 0 var(--bevel-inner),
-        inset -16px -16px 0 0 var(--bevel-inner),
-        inset 17px 17px 0 0 var(--highlight),
-        inset -17px -17px 0 0 var(--bevel-shadow),
-        inset 18px 18px 0 0 var(--bevel-inner),
-        inset -18px -18px 0 0 var(--bevel-inner),
-        inset 19px 19px 0 0 var(--highlight),
-        inset -19px -19px 0 0 var(--bevel-shadow),
-        inset 20px 20px 0 0 var(--bevel-inner),
-        inset -20px -20px 0 0 var(--bevel-inner);
+        0 8px 24px rgba(0, 0, 0, 0.12),
+        inset 2px 2px 0 var(--highlight),
+        inset -2px -2px 0 var(--dark-shadow);
     }
 
     #rainbowHeader {
@@ -123,7 +86,7 @@
       width: 100%;
     }
 
-    /* Title: 50px, light fill cut by many thin horizontal black lines */
+    /* Title: 100px, light fill cut by many thin horizontal black lines */
     .citatio-title {
       position: absolute;
       top: 12px;
@@ -131,7 +94,7 @@
       margin: 0;
       z-index: 20;
       font-family: Chicago, Geneva, "Helvetica Neue", Tahoma, "MS Sans Serif", sans-serif;
-      font-size: 50px;
+      font-size: 100px;
       font-weight: 700;
       line-height: 1.05;
       text-align: left;
@@ -324,76 +287,6 @@
       cursor: wait;
     }
 
-    .help-line {
-      margin: 10px 0 0;
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
-    .rainbow-link {
-      position: relative;
-      display: inline-block;
-      padding-bottom: 4px;
-      margin-bottom: 2px;
-      background-image: linear-gradient(
-        90deg,
-        var(--green),
-        var(--yellow),
-        var(--orange),
-        var(--red),
-        var(--purple),
-        var(--blue),
-        var(--green)
-      );
-      background-size: 220% 100%;
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      animation: rainbow-text-drift 2.4s linear infinite;
-    }
-
-    .rainbow-link:visited {
-      color: transparent;
-    }
-
-    .rainbow-link::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 2px;
-      pointer-events: none;
-      background: repeating-linear-gradient(
-        90deg,
-        var(--green) 0,
-        var(--green) 16.66%,
-        var(--yellow) 16.66%,
-        var(--yellow) 33.33%,
-        var(--orange) 33.33%,
-        var(--orange) 50%,
-        var(--red) 50%,
-        var(--red) 66.66%,
-        var(--purple) 66.66%,
-        var(--purple) 83.33%,
-        var(--blue) 83.33%,
-        var(--blue) 100%
-      );
-      background-size: 200% 100%;
-      animation: rainbow-bar-drift 1.2s linear infinite;
-      opacity: 0.9;
-    }
-
-    @keyframes rainbow-text-drift {
-      0% { background-position: 0% 50%; }
-      100% { background-position: 100% 50%; }
-    }
-
-    @keyframes rainbow-bar-drift {
-      0% { background-position: 0% 0%; }
-      100% { background-position: 32px 0%; }
-    }
-
     .err {
       color: #a00000;
       font-size: 12px;
@@ -467,10 +360,6 @@
         <p class="version-line" id="ver-line">Version <strong>v1.0.5</strong></p>
         <a id="dl" class="win-btn" href="#">Download for Windows</a>
         <p id="err" class="err" style="display:none;"></p>
-        <p class="help-line">
-          Having trouble?
-          <a id="gh" class="rainbow-link" href="https://github.com/SIMI2COOL/Citatio/releases/latest" target="_blank" rel="noopener">View downloads on GitHub</a>
-        </p>
       </div>
     </div>
   </div>
