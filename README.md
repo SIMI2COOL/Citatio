@@ -252,9 +252,11 @@ This repository includes one GitHub Actions workflow:
 
 1. Open your GitHub repository in the browser.
 2. Go to **Releases** → **Draft a new release**.
-3. Create a tag like `v1.0.6` (or `v1.0.0`) and publish the release.
+3. Create a tag like **`v1.0.8`** (or `v1.0.0`) and click **Publish release**.
 4. Wait for the **Release — Windows installer + Linux tarball** workflow to finish (**Actions** tab). It shows two jobs: **Windows (.exe)** and **Linux (.tar.gz)**.
 5. The release should list **`Citatio-Setup-<version>.exe`** and **`Citatio-Linux-<version>.tar.gz`**.
+
+**Si no arranca ningún Action:** el workflow tiene que estar en la **rama por defecto** del repo (suele ser `main`). Fusiona `dev` → `main` en GitHub y vuelve a publicar o a empujar el tag.
 
 Then share this link:
 `https://github.com/<your-username>/Citatio/releases/latest`

@@ -1,11 +1,10 @@
 # =============================================================================
-# Cuándo corre: al PUBLICAR una release en GitHub (no al guardar solo un borrador).
-#   GitHub → Releases → "Draft a new release" → elegir tag (ej. v1.0.7) → Publish release
-# También: pestaña Actions → este workflow → "Run workflow" (prueba sin release).
+# Se ejecuta al PUBLICAR una release (tag v1.0.8, etc.), o manualmente desde Actions.
 #
-# Resultado: el mismo release queda con:
-#   - Citatio-Setup-<versión>.exe   (instalador Windows / Inno Setup)
-#   - Citatio-Linux-<versión>.tar.gz (binario Linux)
+# Si no ves ningún run: este archivo debe estar en la rama POR DEFECTO (p. ej. main).
+#   GitHub → Settings → Branches → Default branch  →  fusiona dev → main primero.
+#
+# “Run workflow” solo sube artefactos de prueba; no adjunta al release.
 # =============================================================================
 
 name: Release — Windows installer + Linux tarball
@@ -49,7 +48,11 @@ jobs:
       - name: Build installer (.exe)
         shell: powershell
         run: |
-          $version = if ("${{ github.event_name }}" -eq "release") { "${{ github.ref_name }}" } else { "manual-${{ github.run_number }}" }
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "manual-${{ github.run_number }}"
+          } else {
+            $version = "${{ github.ref_name }}"
+          }
           if ($version.StartsWith("v")) { $version = $version.Substring(1) }
           $safeVersion = $version -replace '[^0-9A-Za-z\.\-_]', '-'
           $installerName = "Citatio-Setup-$safeVersion"
@@ -97,10 +100,10 @@ jobs:
 
       - name: Package release tarball
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            TAG="${{ github.ref_name }}"
-          else
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="manual-${{ github.run_number }}"
+          else
+            TAG="${{ github.ref_name }}"
           fi
           VERSION="${TAG#v}"
           SAFE=$(echo "$VERSION" | sed 's/[^0-9A-Za-z._-]/-/g')

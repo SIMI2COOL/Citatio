@@ -1,5 +1,6 @@
 [Setup]
-AppId={{CitatioApp}
+; Fixed App ID so upgrades/uninstall match this installer (must stay constant).
+AppId={{E7B3A1F0-4C2D-5E8F-9A1B-2C3D4E5F6078}
 AppName=Citatio
 AppVersion={#MyAppVersion}
 AppPublisher=SIMI2COOL
