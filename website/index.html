@@ -53,17 +53,17 @@
       overflow-x: hidden;
     }
 
-    /* Full-page frame: wraps entire viewport (header, content, taskbar); clicks pass through */
+    /* Full-page frame — border/bevel tripled vs previous (3px line + 9px bevel each side) */
     .page-bevel {
       position: fixed;
       inset: 0;
       pointer-events: none;
       z-index: 9999;
       box-shadow:
-        0 12px 40px rgba(0, 0, 0, 0.14),
-        inset 0 0 0 1px var(--edge),
-        inset 3px 3px 0 var(--highlight),
-        inset -3px -3px 0 var(--dark-shadow);
+        0 36px 120px rgba(0, 0, 0, 0.14),
+        inset 0 0 0 3px var(--edge),
+        inset 9px 9px 0 var(--highlight),
+        inset -9px -9px 0 var(--dark-shadow);
     }
 
     #rainbowHeader {
@@ -84,7 +84,7 @@
       width: 100%;
     }
 
-    /* Title: 100px, thicker dark horizontal bands (reads darker overall) */
+    /* Title: 100px — horizontal black lines on #f0f0f0 (app surface) */
     .citatio-title {
       position: absolute;
       top: 12px;
@@ -99,10 +99,10 @@
       letter-spacing: 0.02em;
       background: repeating-linear-gradient(
         180deg,
-        #d8d8d8 0px,
-        #d8d8d8 4px,
-        #0a0a0a 4px,
-        #0a0a0a 9px
+        #f0f0f0 0px,
+        #f0f0f0 4px,
+        #000000 4px,
+        #000000 9px
       );
       -webkit-background-clip: text;
       background-clip: text;
