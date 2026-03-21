@@ -53,17 +53,15 @@
       overflow-x: hidden;
     }
 
-    /* Full-page frame — border/bevel tripled vs previous (3px line + 9px bevel each side) */
-    .page-bevel {
+    /* Full-page frame drawn on canvas — same algorithm as Citatio.py BevelFrame (thickness 20) */
+    #pageBevelCanvas {
       position: fixed;
       inset: 0;
+      width: 100%;
+      height: 100%;
       pointer-events: none;
       z-index: 9999;
-      box-shadow:
-        0 36px 120px rgba(0, 0, 0, 0.14),
-        inset 0 0 0 3px var(--edge),
-        inset 9px 9px 0 var(--highlight),
-        inset -9px -9px 0 var(--dark-shadow);
+      display: block;
     }
 
     #rainbowHeader {
@@ -369,10 +367,59 @@
     <span class="taskbar-clock" id="clock" aria-live="polite">00:00:00</span>
   </footer>
 
-  <div class="page-bevel" aria-hidden="true"></div>
+  <canvas id="pageBevelCanvas" aria-hidden="true"></canvas>
 
   <script>
     (function () {
+      /* --- Page border: BevelFrame.paintEvent (Citatio.py) — LIGHT palette --- */
+      function drawPageBevel() {
+        var el = document.getElementById("pageBevelCanvas");
+        if (!el) return;
+        var w = window.innerWidth;
+        var h = window.innerHeight;
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        el.style.width = w + "px";
+        el.style.height = h + "px";
+        el.width = Math.floor(w * dpr);
+        el.height = Math.floor(h * dpr);
+        var bctx = el.getContext("2d");
+        bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        bctx.clearRect(0, 0, w, h);
+        var thickness = 20;
+        var highlight_px = Math.max(2, (thickness / 3) | 0);
+        var inner_px = Math.max(2, (thickness / 3) | 0);
+        var HL = "#ffffff";
+        var IN = "#808080";
+        var SH = "#404040";
+        for (var i = 0; i < thickness; i++) {
+          var topLeft = i < highlight_px ? HL : IN;
+          var bottomRight =
+            i < highlight_px || i >= highlight_px + inner_px ? SH : IN;
+          var x0 = i + 0.5;
+          var y0 = i + 0.5;
+          var x1 = w - 1 - i + 0.5;
+          var y1 = h - 1 - i + 0.5;
+          bctx.lineWidth = 1;
+          bctx.strokeStyle = topLeft;
+          bctx.beginPath();
+          bctx.moveTo(x0, y0);
+          bctx.lineTo(x1, y0);
+          bctx.moveTo(x0, y0);
+          bctx.lineTo(x0, y1);
+          bctx.stroke();
+          bctx.strokeStyle = bottomRight;
+          bctx.beginPath();
+          bctx.moveTo(x0, y1);
+          bctx.lineTo(x1, y1);
+          bctx.moveTo(x1, y0);
+          bctx.lineTo(x1, y1);
+          bctx.stroke();
+        }
+      }
+
+      drawPageBevel();
+      window.addEventListener("resize", drawPageBevel);
+
       /* --- RainbowHeader canvas (mirrors Citatio.py RainbowHeader.paintEvent) --- */
       var COLORS = ["#6ABD45", "#F5BC00", "#F6821F", "#E2231A", "#8A2BE2", "#009CDE"];
       var canvas = document.getElementById("rainbowHeader");
