@@ -97,15 +97,16 @@
       --title-stripe-gap: 6.4px;
       --title-stripe-width: 8px;
       position: fixed;
-      left: 0;
-      top: 0;
+      left: 50%;
+      top: calc(var(--content-top) + 16px);
+      transform: translateX(-50%);
       margin: 0;
       z-index: 24;
       width: max-content;
       max-width: calc(100vw - 2 * var(--bevel-frame));
       pointer-events: none;
       font-family: Chicago, Geneva, "Helvetica Neue", Tahoma, "MS Sans Serif", sans-serif;
-      font-size: 100px;
+      font-size: 150px;
       font-weight: 600;
       line-height: 1.05;
       text-align: center;
@@ -375,7 +376,7 @@
 
   <div class="content-stage"></div>
 
-  <h1 class="citatio-title" id="citatioTitle">Citatio</h1>
+  <h1 class="citatio-title">Citatio</h1>
 
   <div id="trailLayer" aria-hidden="true"></div>
 
@@ -526,9 +527,7 @@
       /* --- Draggable window with lag + fading trail --- */
       var winEl = document.getElementById("downloadWindow");
       var titleBar = document.getElementById("titleBar");
-      var titleEl = document.getElementById("citatioTitle");
       var trailLayer = document.getElementById("trailLayer");
-      var TITLE_GAP = 16;
       var HEADER = BEVEL + 52;
       var TASKBAR = BEVEL + 32;
 
@@ -565,22 +564,9 @@
         applyPos();
       }
 
-      function updateTitlePosition() {
-        if (!titleEl || !winEl) return;
-        var rw = winEl.offsetWidth;
-        var th = titleEl.offsetHeight || 105;
-        var cx = curX + rw / 2;
-        var desiredTop = curY - th - TITLE_GAP;
-        var minTop = HEADER + 6;
-        titleEl.style.left = Math.round(cx) + "px";
-        titleEl.style.top = Math.round(Math.max(minTop, desiredTop)) + "px";
-        titleEl.style.transform = "translateX(-50%)";
-      }
-
       function applyPos() {
         winEl.style.left = Math.round(curX) + "px";
         winEl.style.top = Math.round(curY) + "px";
-        updateTitlePosition();
       }
 
       function spawnTrail() {
@@ -668,9 +654,6 @@
       } else {
         centerWindow();
       }
-      requestAnimationFrame(function () {
-        requestAnimationFrame(updateTitlePosition);
-      });
       requestAnimationFrame(animLoop);
 
       /* --- Clock, fake title buttons, download API, boot beep --- */
