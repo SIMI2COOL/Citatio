@@ -87,8 +87,15 @@
       width: 100%;
     }
 
-    /* Title: stripes — gaps are transparent (page shows through); black bands + top/bottom edge lines */
+    /*
+      Title stripes — tune in browser: Inspect the h1 → edit --title-stripe-gap / --title-stripe-width
+      on .citatio-title (Chrome/Edge: right panel “element.style” or the rule block).
+      - --title-stripe-gap: space between black lines (bigger = fewer, thinner-looking lines overall)
+      - --title-stripe-width: thickness of each black line (try 1px–4px; too high looks “solid”)
+    */
     .citatio-title {
+      --title-stripe-gap: 12px;
+      --title-stripe-width: 1px;
       position: absolute;
       top: 12px;
       left: 20px;
@@ -102,13 +109,12 @@
       letter-spacing: 0.02em;
       color: transparent;
       -webkit-text-fill-color: transparent;
-      /* Thin horizontal rules: mostly transparent, narrow black (avoids “solid fill”) */
       background: repeating-linear-gradient(
         180deg,
-        transparent 0px,
-        transparent 12px,
-        #000000 12px,
-        #000000 13px
+        transparent 0,
+        transparent var(--title-stripe-gap),
+        #000000 var(--title-stripe-gap),
+        #000000 calc(var(--title-stripe-gap) + var(--title-stripe-width))
       );
       -webkit-background-clip: text;
       background-clip: text;
