@@ -2,7 +2,14 @@
 
 Single static page in **English**: platinum grey UI matching the desktop app (`theme.py`), **IBM-style striped** “CITATIO” title (fixed at the top center of the page; **does not** move with the download window), app **logo** in the window (`logo.ico`), **animated rainbow** on the “View downloads on GitHub” link (same six colors as `RainbowHeader` in the app), Win95-style chrome, and a bottom bar: **Made by Teo Simon Untroib** + clock.
 
-**Download for Windows** resolves the latest `Citatio-Setup-*.exe` from [GitHub Releases](https://github.com/SIMI2COOL/Citatio/releases).
+The page loads the latest release from GitHub and wires:
+
+- **Windows** → `Citatio-Setup-*.exe`
+- **Linux** → `Citatio-Linux-*.tar.gz` (produced by `.github/workflows/release-linux.yml`)
+
+### Link preview (WhatsApp, etc.)
+
+`index.html` includes Open Graph tags pointing at **`og-image.png`** (in this folder). Replace `website/og-image.png` with your own screenshot (~**1200×630** looks best) if you want a branded preview; then redeploy Vercel.
 
 ## Deploy on Vercel
 

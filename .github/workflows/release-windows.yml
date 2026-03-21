@@ -1,3 +1,4 @@
+# Pairs with release-linux.yml: same GitHub Release gets the .exe (this job) and Citatio-Linux-*.tar.gz (Linux job).
 name: Build and Attach Windows Installer
 
 on:

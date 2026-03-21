@@ -244,21 +244,20 @@ You can publish Citatio so people download it from a web page, without cloning t
 
 ### One-time setup
 
-This repository includes a GitHub Actions workflow at:
-`.github/workflows/release-windows.yml`
+This repository includes GitHub Actions workflows:
 
-It automatically:
-- Builds `Citatio.exe` on Windows
-- Creates a real installer: `Citatio-Setup-<version>.exe`
-- Attaches that installer to your GitHub Release
+- `.github/workflows/release-windows.yml` — builds `Citatio.exe`, runs Inno Setup, attaches **`Citatio-Setup-<version>.exe`** to the release.
+- `.github/workflows/release-linux.yml` — builds the Linux PyInstaller binary and attaches **`Citatio-Linux-<version>.tar.gz`** (extract and run `./Citatio`; use `chmod +x` if needed).
+
+Both run when you **publish** a GitHub Release (same tag, e.g. `v1.0.6`).
 
 ### How to publish each app version
 
 1. Open your GitHub repository in the browser.
-2. Go to **Releases** -> **Draft a new release**.
-3. Create a tag like `v1.0.0` and publish.
-4. Wait for the workflow to finish (Actions tab).
-5. The release will contain `Citatio-Setup-<version>.exe` as a downloadable installer.
+2. Go to **Releases** → **Draft a new release**.
+3. Create a tag like `v1.0.6` (or `v1.0.0`) and publish the release.
+4. Wait for **both** workflows to finish (**Actions** tab): one Windows job and one Linux job.
+5. The release should list **`Citatio-Setup-<version>.exe`** and **`Citatio-Linux-<version>.tar.gz`**.
 
 Then share this link:
 `https://github.com/<your-username>/Citatio/releases/latest`
@@ -278,9 +277,9 @@ The repo includes a simple landing page at `docs/index.html` with a big **Downlo
 
 You only publish new app versions the same way as before (new release tag). The landing page keeps working without editing the HTML each time.
 
-### Vercel (same look as the app, one download button)
+### Vercel (same look as the app, Windows + Linux downloads)
 
-A dedicated static page lives in **`website/`** — platinum grey UI + rainbow strip, matching `desktop/theme.py`. Deploy that folder on Vercel (set **Root Directory** to `website`). See **`website/README.md`** for step-by-step.
+A dedicated static page lives in **`website/`** — platinum grey UI + rainbow strip, matching `desktop/theme.py`. It picks up the latest **`Citatio-Setup-*.exe`** and **`Citatio-Linux-*.tar.gz`** from GitHub Releases. Deploy that folder on Vercel (set **Root Directory** to `website`). See **`website/README.md`** for step-by-step.
 
 ## Search tips ✨
 

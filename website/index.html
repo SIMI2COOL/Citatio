@@ -4,7 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Citatio — Download</title>
-  <meta name="description" content="Download Citatio for Windows." />
+  <link rel="canonical" href="https://download-citatio.vercel.app/" />
+  <!-- Open Graph / WhatsApp link preview (add website/og-image.png ~1200×630 for the image) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://download-citatio.vercel.app/" />
+  <meta property="og:title" content="Citatio — Download" />
+  <meta property="og:image" content="https://download-citatio.vercel.app/og-image.png" />
+  <meta property="og:image:alt" content="Citatio download page" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Citatio — Download" />
+  <meta name="twitter:image" content="https://download-citatio.vercel.app/og-image.png" />
   <style>
     /* Matches desktop/theme.py — LIGHT palette + BevelFrame colors */
     :root {
@@ -278,13 +287,6 @@
       object-fit: contain;
     }
 
-    .blurb {
-      margin: 0 0 14px;
-      font-size: 17px;
-      line-height: 1.5;
-      color: var(--text);
-    }
-
     .version-line {
       font-size: 16px;
       color: var(--text-muted);
@@ -326,6 +328,28 @@
     .win-btn:disabled {
       color: var(--edge);
       cursor: wait;
+    }
+
+    .dl-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 2px;
+    }
+
+    .linux-hint {
+      margin: 10px 0 0;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--text-muted);
+    }
+
+    .linux-hint code {
+      font-family: "Lucida Console", Monaco, monospace;
+      font-size: 12px;
+      background: var(--field);
+      padding: 1px 5px;
+      border: 1px solid var(--light-edge);
     }
 
     .err {
@@ -395,11 +419,14 @@
       </div>
       <div class="win-body">
         <img class="hero-logo" src="logo.ico" width="80" height="80" alt="Citatio" />
-        <p class="blurb">
-          Find and rank the most-cited papers on any topic (Google Scholar). Export clean results to <strong>CSV</strong> or <strong>Excel</strong>.
+        <p class="version-line" id="ver-line">Version <strong>v1.0.6</strong></p>
+        <div class="dl-actions">
+          <a id="dl-win" class="win-btn" href="https://github.com/SIMI2COOL/Citatio/releases/latest">Checking latest version…</a>
+          <a id="dl-linux" class="win-btn" href="https://github.com/SIMI2COOL/Citatio/releases/latest">Checking latest version…</a>
+        </div>
+        <p class="linux-hint">
+          <strong>Linux:</strong> extract the <code>.tar.gz</code>, then run <code>./Citatio</code>. If it won’t start, try <code>chmod +x Citatio</code> first.
         </p>
-        <p class="version-line" id="ver-line">Version <strong>v1.0.5</strong></p>
-        <a id="dl" class="win-btn" href="#">Download for Windows</a>
         <p id="err" class="err" style="display:none;"></p>
       </div>
     </div>
@@ -703,15 +730,28 @@
       });
       document.body.addEventListener("pointerdown", playBootSound, { once: true });
 
-      var dl = document.getElementById("dl");
+      var dlWin = document.getElementById("dl-win");
+      var dlLinux = document.getElementById("dl-linux");
       var verLine = document.getElementById("ver-line");
       var err = document.getElementById("err");
       var fallback = "https://github.com/SIMI2COOL/Citatio/releases/latest";
-      var defaultVer = "v1.0.5";
+      var defaultVer = "v1.0.6";
 
-      dl.href = fallback;
-      dl.textContent = "Checking latest version…";
-      dl.setAttribute("aria-busy", "true");
+      function setBusy(busy) {
+        if (busy) {
+          dlWin.setAttribute("aria-busy", "true");
+          dlLinux.setAttribute("aria-busy", "true");
+        } else {
+          dlWin.removeAttribute("aria-busy");
+          dlLinux.removeAttribute("aria-busy");
+        }
+      }
+
+      dlWin.href = fallback;
+      dlLinux.href = fallback;
+      dlWin.textContent = "Checking latest version…";
+      dlLinux.textContent = "Checking latest version…";
+      setBusy(true);
 
       fetch("https://api.github.com/repos/SIMI2COOL/Citatio/releases/latest")
         .then(function (r) {
@@ -723,27 +763,56 @@
           var exe = assets.find(function (a) {
             return /^Citatio-Setup-.+\.exe$/i.test(a.name);
           });
+          var linux = assets.find(function (a) {
+            return /^Citatio-Linux-.+\.tar\.gz$/i.test(a.name);
+          });
           if (data.tag_name) {
             verLine.innerHTML = "Version <strong>" + data.tag_name + "</strong>";
           }
+
           if (exe && exe.browser_download_url) {
-            dl.href = exe.browser_download_url;
-            dl.download = exe.name;
-            dl.textContent = "Download for Windows";
-            dl.removeAttribute("aria-busy");
+            dlWin.href = exe.browser_download_url;
+            dlWin.setAttribute("download", exe.name);
+            dlWin.textContent = "Download for Windows";
           } else {
-            dl.href = fallback;
-            dl.textContent = "Open download page";
-            dl.removeAttribute("aria-busy");
-            err.textContent = "Installer .exe not found for this release. Open the Citatio repository on GitHub and check Releases.";
+            dlWin.href = fallback;
+            dlWin.removeAttribute("download");
+            dlWin.textContent = "Open download page (Windows)";
+          }
+
+          if (linux && linux.browser_download_url) {
+            dlLinux.href = linux.browser_download_url;
+            dlLinux.setAttribute("download", linux.name);
+            dlLinux.textContent = "Download for Linux (.tar.gz)";
+          } else {
+            dlLinux.href = fallback;
+            dlLinux.removeAttribute("download");
+            dlLinux.textContent = "Linux build on GitHub Releases";
+          }
+
+          setBusy(false);
+
+          var problems = [];
+          if (!exe || !exe.browser_download_url) {
+            problems.push("Windows installer (.exe) not attached to this release yet.");
+          }
+          if (!linux || !linux.browser_download_url) {
+            problems.push("Linux archive (Citatio-Linux-….tar.gz) not attached yet.");
+          }
+          if (problems.length) {
+            err.textContent = problems.join(" ") + " You can still open the release page from the buttons above.";
             err.style.display = "block";
             verLine.innerHTML = "Version <strong>" + (data.tag_name || defaultVer) + "</strong>";
           }
         })
         .catch(function () {
-          dl.href = fallback;
-          dl.textContent = "Open download page";
-          dl.removeAttribute("aria-busy");
+          dlWin.href = fallback;
+          dlLinux.href = fallback;
+          dlWin.removeAttribute("download");
+          dlLinux.removeAttribute("download");
+          dlWin.textContent = "Open download page";
+          dlLinux.textContent = "Open download page";
+          setBusy(false);
           verLine.innerHTML = "Version <strong>" + defaultVer + "</strong>";
           err.textContent = "Could not reach GitHub. Try again later or open the repository in your browser.";
           err.style.display = "block";
