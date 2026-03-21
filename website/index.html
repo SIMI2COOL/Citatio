@@ -29,6 +29,10 @@
       --blue: #009cde;
       --header-h: 52px;
       --taskbar-h: 32px;
+      /* Must match BevelFrame thickness in Citatio.py / drawPageBevel */
+      --bevel-frame: 20px;
+      --content-top: calc(var(--bevel-frame) + var(--header-h));
+      --content-bottom: calc(var(--bevel-frame) + var(--taskbar-h));
     }
 
     * { box-sizing: border-box; }
@@ -44,7 +48,7 @@
     body {
       margin: 0;
       min-height: 100vh;
-      padding: var(--header-h) 0 var(--taskbar-h);
+      padding: var(--content-top) var(--bevel-frame) var(--content-bottom);
       font-family: Chicago, Geneva, "Helvetica Neue", Tahoma, "MS Sans Serif", sans-serif;
       font-size: 14px;
       color: var(--text);
@@ -66,9 +70,10 @@
 
     #rainbowHeader {
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
+      top: var(--bevel-frame);
+      left: var(--bevel-frame);
+      right: var(--bevel-frame);
+      width: auto;
       height: var(--header-h);
       z-index: 50;
       display: block;
@@ -78,7 +83,7 @@
     .content-stage {
       position: relative;
       z-index: 10;
-      min-height: calc(100vh - var(--header-h) - var(--taskbar-h));
+      min-height: calc(100vh - var(--content-top) - var(--content-bottom));
       width: 100%;
     }
 
@@ -109,10 +114,10 @@
 
     #trailLayer {
       position: fixed;
-      left: 0;
-      right: 0;
-      top: var(--header-h);
-      bottom: var(--taskbar-h);
+      left: var(--bevel-frame);
+      right: var(--bevel-frame);
+      top: var(--content-top);
+      bottom: var(--content-bottom);
       pointer-events: none;
       z-index: 8;
       overflow: hidden;
@@ -121,16 +126,15 @@
     .trail-ghost {
       position: absolute;
       box-sizing: border-box;
-      border: 3px solid;
-      /* border-color, background, box-shadow set in JS (rainbow) */
-      animation: trail-fade 0.75s ease-out forwards;
-      will-change: opacity, transform;
+      border: 2px solid;
+      /* border-color + flat background set in JS — no glow */
+      animation: trail-fade 0.55s ease-out forwards;
+      will-change: opacity;
     }
 
     @keyframes trail-fade {
       to {
         opacity: 0;
-        transform: scale(0.99);
       }
     }
 
@@ -294,9 +298,9 @@
 
     .taskbar {
       position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      left: var(--bevel-frame);
+      right: var(--bevel-frame);
+      bottom: var(--bevel-frame);
       z-index: 60;
       height: var(--taskbar-h);
       display: flex;
@@ -429,9 +433,11 @@
       /* Same cadence as Citatio.py RainbowHeader: QTimer 120 ms */
       var RAINBOW_INTERVAL_MS = 120;
 
+      var BEVEL = 20;
+
       function resizeCanvas() {
         var dpr = Math.min(window.devicePixelRatio || 1, 2);
-        var w = window.innerWidth;
+        var w = window.innerWidth - 2 * BEVEL;
         var h = 52;
         canvas.style.width = w + "px";
         canvas.style.height = h + "px";
@@ -442,7 +448,7 @@
 
       function drawRainbow() {
         tick = (tick + 1) % 10000;
-        var w = window.innerWidth;
+        var w = window.innerWidth - 2 * BEVEL;
         var h = 52;
         var stripeH = Math.max(1, Math.floor(h / COLORS.length));
         var drift = (tick * 2) % (block * COLORS.length);
@@ -483,8 +489,8 @@
       var winEl = document.getElementById("downloadWindow");
       var titleBar = document.getElementById("titleBar");
       var trailLayer = document.getElementById("trailLayer");
-      var HEADER = 52;
-      var TASKBAR = 32;
+      var HEADER = BEVEL + 52;
+      var TASKBAR = BEVEL + 32;
 
       var curX = 0,
         curY = 0,
@@ -513,7 +519,8 @@
         var rw = winEl.offsetWidth;
         var rh = winEl.offsetHeight;
         var availH = window.innerHeight - HEADER - TASKBAR;
-        tgtX = curX = (window.innerWidth - rw) / 2;
+        var maxX = window.innerWidth - BEVEL - rw;
+        tgtX = curX = clamp((window.innerWidth - rw) / 2, BEVEL, maxX);
         tgtY = curY = HEADER + (availH - rh) / 2;
         applyPos();
       }
@@ -531,20 +538,16 @@
         var c = COLORS[trailColorIndex % COLORS.length];
         trailColorIndex++;
         g.style.borderColor = c;
-        g.style.background = hexToRgba(c, 0.12);
-        g.style.boxShadow =
-          "0 0 14px " +
-          hexToRgba(c, 0.45) +
-          ", inset 0 0 0 1px " +
-          hexToRgba(c, 0.35);
+        g.style.background = hexToRgba(c, 0.08);
+        g.style.boxShadow = "none";
         g.style.width = rw + "px";
         g.style.height = rh + "px";
-        g.style.left = Math.round(curX) + "px";
+        g.style.left = Math.round(curX - BEVEL) + "px";
         g.style.top = Math.round(curY - HEADER) + "px";
         trailLayer.appendChild(g);
         setTimeout(function () {
           if (g.parentNode) g.parentNode.removeChild(g);
-        }, 800);
+        }, 600);
       }
 
       function animLoop() {
@@ -559,11 +562,11 @@
         if (dragging && moved) {
           var dist = Math.hypot(curX - lastTrailX, curY - lastTrailY);
           trailCooldown--;
-          if (dist > 6 && trailCooldown <= 0) {
+          if (dist > 2 && trailCooldown <= 0) {
             spawnTrail();
             lastTrailX = curX;
             lastTrailY = curY;
-            trailCooldown = 2;
+            trailCooldown = 0;
           }
         }
 
@@ -585,9 +588,9 @@
         if (!dragging) return;
         var rw = winEl.offsetWidth;
         var rh = winEl.offsetHeight;
-        var maxX = window.innerWidth - rw;
+        var maxX = window.innerWidth - BEVEL - rw;
         var maxY = window.innerHeight - TASKBAR - rh;
-        tgtX = clamp(e.clientX - dragOffX, 0, maxX);
+        tgtX = clamp(e.clientX - dragOffX, BEVEL, maxX);
         tgtY = clamp(e.clientY - dragOffY, HEADER, maxY);
       });
 
@@ -598,9 +601,9 @@
       window.addEventListener("resize", function () {
         var rw = winEl.offsetWidth;
         var rh = winEl.offsetHeight;
-        var maxX = window.innerWidth - rw;
+        var maxX = window.innerWidth - BEVEL - rw;
         var maxY = window.innerHeight - TASKBAR - rh;
-        tgtX = curX = clamp(curX, 0, maxX);
+        tgtX = curX = clamp(curX, BEVEL, maxX);
         tgtY = curY = clamp(curY, HEADER, maxY);
         applyPos();
       });
