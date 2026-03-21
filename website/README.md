@@ -7,6 +7,8 @@ The page loads the latest release from GitHub and wires:
 - **Windows** → `Citatio-Setup-*.exe`
 - **Linux** → `Citatio-Linux-*.tar.gz` (produced by `.github/workflows/release-linux.yml`)
 
+Download buttons use **`dl-icon-windows.svg`** (Windows XP–style mark from your Icons8 asset) and **`dl-icon-linux.svg`** (Tux artwork). If Icons8’s license for your account asks for attribution, add it in the page footer or here in the docs.
+
 ### Link preview (WhatsApp, etc.)
 
 `index.html` includes Open Graph tags pointing at **`og-image.png`** (in this folder). Replace `website/og-image.png` with your own screenshot (~**1200×630** looks best) if you want a branded preview; then redeploy Vercel.

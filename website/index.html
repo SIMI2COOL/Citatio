@@ -300,7 +300,7 @@
     .win-btn {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
       gap: 12px;
       width: 100%;
       min-height: 44px;
@@ -329,10 +329,11 @@
     .dl-btn-icon {
       flex-shrink: 0;
       display: block;
-      width: 26px;
-      height: 26px;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+      object-position: center;
+      pointer-events: none;
     }
 
     .win-btn:disabled {
@@ -417,28 +418,12 @@
         <p class="version-line" id="ver-line">Version <strong>v1.0.6</strong></p>
         <div class="dl-actions">
           <a id="dl-win" class="win-btn" href="https://github.com/SIMI2COOL/Citatio/releases/latest">
-            <!-- Classic 4-pane Windows-style mark (retro, not an official trademark reproduction) -->
-            <svg class="dl-btn-icon" viewBox="0 0 16 16" width="26" height="26" aria-hidden="true">
-              <rect x="0.5" y="0.5" width="6" height="6" fill="#e14b3b" stroke="#1a1a1a" stroke-width="1" />
-              <rect x="9.5" y="0.5" width="6" height="6" fill="#6bb85a" stroke="#1a1a1a" stroke-width="1" />
-              <rect x="0.5" y="9.5" width="6" height="6" fill="#4a9fd8" stroke="#1a1a1a" stroke-width="1" />
-              <rect x="9.5" y="9.5" width="6" height="6" fill="#f0c040" stroke="#1a1a1a" stroke-width="1" />
-            </svg>
             <span id="dl-win-label">Checking latest version…</span>
+            <img class="dl-btn-icon" src="dl-icon-windows.svg" width="28" height="28" alt="" decoding="async" />
           </a>
           <a id="dl-linux" class="win-btn" href="https://github.com/SIMI2COOL/Citatio/releases/latest">
-            <svg class="dl-btn-icon" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
-              <ellipse cx="16" cy="22" rx="11" ry="9" fill="#1a1a1a" />
-              <ellipse cx="16" cy="23" rx="6" ry="5" fill="#f2f2f2" />
-              <circle cx="16" cy="10" r="8.5" fill="#1a1a1a" />
-              <ellipse cx="16" cy="11" rx="5.5" ry="4.5" fill="#f2f2f2" />
-              <circle cx="13" cy="10" r="1.4" fill="#0d0d0d" />
-              <circle cx="19" cy="10" r="1.4" fill="#0d0d0d" />
-              <path d="M14 13.5 L18 13.5 L16 16.5 Z" fill="#e8a020" />
-              <ellipse cx="11.5" cy="28.5" rx="3.5" ry="2" fill="#e8a020" />
-              <ellipse cx="20.5" cy="28.5" rx="3.5" ry="2" fill="#e8a020" />
-            </svg>
             <span id="dl-linux-label">Checking latest version…</span>
+            <img class="dl-btn-icon" src="dl-icon-linux.svg" width="28" height="28" alt="" decoding="async" />
           </a>
         </div>
         <p id="err" class="err" style="display:none;"></p>
