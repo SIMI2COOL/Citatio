@@ -87,7 +87,7 @@
       width: 100%;
     }
 
-    /* Title: 100px — horizontal black lines on #f0f0f0 (app surface) */
+    /* Title: stripes — gaps are transparent (page shows through); black bands + top/bottom edge lines */
     .citatio-title {
       position: absolute;
       top: 12px;
@@ -100,16 +100,20 @@
       line-height: 1.05;
       text-align: left;
       letter-spacing: 0.02em;
+      color: transparent;
       background: repeating-linear-gradient(
         180deg,
-        #f0f0f0 0px,
-        #f0f0f0 4px,
+        transparent 0px,
+        transparent 4px,
         #000000 4px,
         #000000 9px
       );
       -webkit-background-clip: text;
       background-clip: text;
-      color: transparent;
+      /* Black always visible along upper/lower edge of each glyph */
+      text-shadow:
+        0 -0.045em 0 #000000,
+        0 0.045em 0 #000000;
     }
 
     #trailLayer {
