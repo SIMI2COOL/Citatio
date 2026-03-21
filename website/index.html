@@ -96,24 +96,22 @@
       z-index: 20;
       font-family: Chicago, Geneva, "Helvetica Neue", Tahoma, "MS Sans Serif", sans-serif;
       font-size: 100px;
-      font-weight: 700;
+      font-weight: 600;
       line-height: 1.05;
       text-align: left;
       letter-spacing: 0.02em;
       color: transparent;
+      -webkit-text-fill-color: transparent;
+      /* Thin horizontal rules: mostly transparent, narrow black (avoids “solid fill”) */
       background: repeating-linear-gradient(
         180deg,
         transparent 0px,
-        transparent 4px,
-        #000000 4px,
-        #000000 9px
+        transparent 12px,
+        #000000 12px,
+        #000000 13px
       );
       -webkit-background-clip: text;
       background-clip: text;
-      /* Black always visible along upper/lower edge of each glyph */
-      text-shadow:
-        0 -0.045em 0 #000000,
-        0 0.045em 0 #000000;
     }
 
     #trailLayer {
